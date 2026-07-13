@@ -102,13 +102,23 @@ services:
           memory: 400M
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_PASSWORD_ENCRYPT_KEY: ${VITE_PASSWORD_ENCRYPT_KEY}
+        VITE_REGISTRATION_ENABLED: ${VITE_REGISTRATION_ENABLED:-false}
     container_name: askb-frontend
     restart: unless-stopped
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
     depends_on:
       - backend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /var/www/certbot:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     deploy:
       resources:
         limits:
