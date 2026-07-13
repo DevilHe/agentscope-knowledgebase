@@ -3,6 +3,7 @@ import random
 import secrets
 import string
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -11,19 +12,51 @@ from app.db.redis_client import get_redis
 CAPTCHA_PREFIX = "auth:captcha:"
 CAPTCHA_TTL = 300
 
+_AUTH_DIR = Path(__file__).resolve().parent
+_BUNDLED_FONT = _AUTH_DIR / "assets" / "DejaVuSans-Bold.ttf"
 
-def _load_font(size: int = 28) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+
+def _font_candidates() -> list[Path]:
     candidates = [
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+        _BUNDLED_FONT,
+        Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        Path("/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"),
+        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
     ]
+
+    seen: set[Path] = set()
+    ordered: list[Path] = []
     for path in candidates:
+        if path not in seen:
+            seen.add(path)
+            ordered.append(path)
+
+    for root in (Path("/usr/share/fonts"), Path("/usr/local/share/fonts")):
+        if not root.is_dir():
+            continue
+        for pattern in ("*Bold*.ttf", "*.ttf"):
+            for path in sorted(root.rglob(pattern)):
+                if path not in seen:
+                    seen.add(path)
+                    ordered.append(path)
+
+    return ordered
+
+
+def _load_font(size: int = 28) -> ImageFont.FreeTypeFont:
+    for path in _font_candidates():
+        if not path.is_file():
+            continue
         try:
-            return ImageFont.truetype(path, size)
+            return ImageFont.truetype(str(path), size)
         except OSError:
             continue
-    return ImageFont.load_default()
+
+    raise RuntimeError(
+        "No captcha font found. Install fonts-dejavu-core in the container or place "
+        f"DejaVuSans-Bold.ttf at {_BUNDLED_FONT}"
+    )
 
 
 def _render_captcha_image(text: str) -> str:

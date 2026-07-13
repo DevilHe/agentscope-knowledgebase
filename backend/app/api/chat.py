@@ -37,20 +37,29 @@ async def rag_chat(
     )
 
     async def event_generator():
-        kb_slugs = list_retrieval_knowledge_bases(db, user)
-        if not kb_slugs:
-            yield {"event": "error", "data": json.dumps({"message": "未分配可访问知识库"}, ensure_ascii=False)}
-            return
-        async for event, data in stream_rag_answer(
-            question=body.question,
-            session_id=body.session_id,
-            user=user,
-            top_k=body.top_k,
-            db=db,
-            ip_address=ip,
-            knowledge_bases=kb_slugs,
-        ):
-            payload = json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else data
-            yield {"event": event, "data": payload}
+        try:
+            kb_slugs = list_retrieval_knowledge_bases(db, user)
+            if not kb_slugs:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": "未分配可访问知识库"}, ensure_ascii=False),
+                }
+                return
+            async for event, data in stream_rag_answer(
+                question=body.question,
+                session_id=body.session_id,
+                user=user,
+                top_k=body.top_k,
+                db=db,
+                ip_address=ip,
+                knowledge_bases=kb_slugs,
+            ):
+                payload = json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else data
+                yield {"event": event, "data": payload}
+        except PermissionError:
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": "无权访问该会话"}, ensure_ascii=False),
+            }
 
     return EventSourceResponse(event_generator())

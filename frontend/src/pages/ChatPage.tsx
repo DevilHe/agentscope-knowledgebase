@@ -66,7 +66,7 @@ export default function ChatPage() {
   const [departmentNames, setDepartmentNames] = useState<string[]>(
     () => getStoredUser()?.department_names || []
   );
-  const { answer, sources, showSources, cotTrace, loading, sessionId, ask, stop, reset, setActiveSession } = useRagStream();
+  const { answer, sources, showSources, cotTrace, loading, sessionId, ask, stop, detach, stopIfSession, reset, setActiveSession } = useRagStream();
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialSessionRef = useRef(searchParams.get("session"));
   const bootstrappedRef = useRef(false);
@@ -89,6 +89,7 @@ export default function ChatPage() {
 
   const loadSessionById = useCallback(
     async (id: string) => {
+      if (loading) detach();
       loadingSessionRef.current = id;
       streamingAssistRef.current = null;
       setStreamingId(null);
@@ -114,7 +115,7 @@ export default function ChatPage() {
         }
       }
     },
-    [setActiveSession, setSearchParams]
+    [detach, setActiveSession, setSearchParams]
   );
 
   useEffect(() => {
@@ -150,47 +151,35 @@ export default function ChatPage() {
   }, [loadSessions, loadSessionById]);
 
   useEffect(() => {
-    if (!streamingId) return;
-
-    if (loading) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === streamingId
-            ? { ...m, content: answer, streaming: true, cot: cotTrace }
-            : m
-        )
-      );
-      return;
-    }
+    if (!streamingId || !loading) return;
 
     setMessages((prev) =>
       prev.map((m) =>
         m.id === streamingId
+          ? { ...m, content: answer, streaming: true, cot: cotTrace }
+          : m
+      )
+    );
+  }, [streamingId, loading, answer, cotTrace]);
+
+  const onStop = useCallback(() => {
+    const assistId = streamingAssistRef.current;
+    stop();
+    if (!assistId) return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistId
           ? {
               ...m,
-              content: answer || m.content,
-              sources,
-              show_sources: showSources,
-              cot: cotTrace,
               streaming: false,
+              cot: m.cot && m.cot.steps.length ? finalizeCotTrace(m.cot) : m.cot,
             }
           : m
       )
     );
-
-    if (!cotTrace.finished) return;
-
     streamingAssistRef.current = null;
     setStreamingId(null);
-    if (sessionId) {
-      setActiveSessionId(sessionId);
-      loadingSessionRef.current = sessionId;
-      if (searchParams.get("session") !== sessionId) {
-        setSearchParams({ session: sessionId }, { replace: true });
-      }
-    }
-    if (answer) loadSessions();
-  }, [loading, answer, sources, showSources, cotTrace, streamingId, sessionId, searchParams, setSearchParams, loadSessions]);
+  }, [stop]);
 
   useEffect(() => {
     scrollToBottom();
@@ -202,7 +191,8 @@ export default function ChatPage() {
   };
 
   const onNewChat = () => {
-    if (messages.length === 0 && !activeSessionId) return;
+    if (messages.length === 0 && !activeSessionId && !loading) return;
+    if (loading) detach();
     loadingSessionRef.current = null;
     streamingAssistRef.current = null;
     setStreamingId(null);
@@ -214,6 +204,7 @@ export default function ChatPage() {
 
   const onDeleteSession = async (id: string) => {
     try {
+      stopIfSession(id);
       await deleteSession(id);
       if (sessionId === id || activeSessionId === id) {
         streamingAssistRef.current = null;
@@ -251,10 +242,73 @@ export default function ChatPage() {
       },
     ]);
     setQuestion("");
-    try {
-      await ask(q, activeSessionId);
-    } catch (e) {
-      if ((e as Error).name !== "AbortError") message.error((e as Error).message);
+    const originSessionId = activeSessionId;
+    const result = await ask(q, activeSessionId);
+    const attached = streamingAssistRef.current === assistId;
+
+    if (attached) {
+      if (result.status === "error") {
+        message.error(result.message);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistId
+              ? {
+                  ...m,
+                  content: result.message,
+                  streaming: false,
+                  cot: result.cotTrace,
+                }
+              : m
+          )
+        );
+      } else if (result.status === "done") {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistId
+              ? {
+                  ...m,
+                  content: result.answer,
+                  sources: result.sources,
+                  show_sources: result.showSources,
+                  streaming: false,
+                  cot: result.cotTrace,
+                }
+              : m
+          )
+        );
+        if (result.sessionId) {
+          setActiveSessionId(result.sessionId);
+          loadingSessionRef.current = result.sessionId;
+          if (searchParams.get("session") !== result.sessionId) {
+            setSearchParams({ session: result.sessionId }, { replace: true });
+          }
+        }
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistId
+              ? {
+                  ...m,
+                  content: result.answer || m.content,
+                  streaming: false,
+                  cot: result.cotTrace,
+                }
+              : m
+          )
+        );
+      }
+      streamingAssistRef.current = null;
+      setStreamingId(null);
+    } else if (result.status === "error" && originSessionId && activeSessionId === originSessionId) {
+      message.error(result.message);
+    }
+
+    if (result.status === "done") {
+      await loadSessions();
+      const doneSessionId = result.sessionId;
+      if (!attached && doneSessionId && activeSessionId === doneSessionId) {
+        await loadSessionById(doneSessionId);
+      }
     }
   };
 
@@ -359,7 +413,7 @@ export default function ChatPage() {
                   loading={loading}
                   onChange={setQuestion}
                   onSend={onSend}
-                  onStop={stop}
+                  onStop={onStop}
                 />
               </div>
             </div>
@@ -429,7 +483,7 @@ export default function ChatPage() {
                     loading={loading}
                     onChange={setQuestion}
                     onSend={onSend}
-                    onStop={stop}
+                    onStop={onStop}
                   />
                 </div>
               </div>
