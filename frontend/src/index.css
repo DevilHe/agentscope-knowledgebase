@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.chat-composer {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px 16px 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.chat-composer .ant-input,
+.chat-composer .ant-input:focus,
+.chat-composer .ant-input-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.chat-composer-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+}
+
+.chat-send-active {
+  background: #4d6bfe !important;
+  border-color: #4d6bfe !important;
+}
+
+.chat-send-idle {
+  background: #c7d2fe !important;
+  border-color: #c7d2fe !important;
+  color: #fff !important;
+}
+
+.rag-markdown {
+  color: #1e293b;
+  font-size: 0.9375rem;
+  line-height: 1.625;
+  word-break: break-word;
+}
+
+.rag-markdown p,
+.rag-markdown li {
+  color: inherit;
+  margin: 0.5em 0;
+}
+
+.rag-markdown table {
+  width: 100%;
+  margin: 0.75em 0;
+  border-collapse: collapse;
+  border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.rag-markdown thead {
+  background: #f8fafc;
+}
+
+.rag-markdown th,
+.rag-markdown td {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+  color: inherit;
+}
+
+.rag-markdown th {
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.rag-markdown tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.rag-markdown ul,
+.rag-markdown ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.rag-markdown h1,
+.rag-markdown h2,
+.rag-markdown h3,
+.rag-markdown h4 {
+  color: #0f172a;
+  font-weight: 600;
+  margin: 0.75em 0 0.5em;
+}
+
+.rag-markdown strong {
+  font-weight: 600;
+}
+
+.rag-markdown pre:not(.code-block-pre) {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.code-block-shell {
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid #334155;
+  background: #0f172a;
+}
+
+.code-block-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.code-block-lang {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.code-block-copy-text.ant-typography {
+  margin: 0;
+  color: #cbd5e1 !important;
+  font-size: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.code-block-copy-text.ant-typography:hover {
+  color: #fff !important;
+}
+
+.code-block-copy-text .ant-typography-copy {
+  color: inherit !important;
+}
+
+.code-block-copy-text .ant-typography-copy-success .anticon-check {
+  color: #52c41a !important;
+}
+
+.code-block-shell .code-block-pre {
+  margin: 0;
+  padding: 1.125rem 1.25rem !important;
+  overflow-x: auto;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.code-block-shell .code-block-pre code {
+  display: block;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.rag-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+
+.rag-markdown code.rag-inline-code,
+.rag-markdown :not(.code-block-pre) > code.rag-inline-code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  color: #1e293b;
+}
+
+.rag-markdown-streaming .streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #4d6bfe;
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "knowledge_base": "default",
+  "top_k": 4,
+  "description": "RAG 评测黄金集示例。复制为 golden_set.json 后按实际文档填写 expected_sources / expected_keywords。",
+  "cases": [
+    {
+      "id": "example-1",
+      "question": "请说明项目中密码传输采用什么加密方式？",
+      "expected_sources": [],
+      "expected_keywords": ["AES", "加密"],
+      "expected_answer_keywords": ["AES"],
+      "tags": ["安全"]
+    },
+    {
+      "id": "example-2",
+      "question": "知识库检索使用了哪些技术？",
+      "expected_keywords": ["向量", "BM25"],
+      "expected_answer_keywords": ["RRF", "Rerank"],
+      "tags": ["RAG"]
+    }
+  ]
+}
