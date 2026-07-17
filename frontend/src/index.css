@@ -135,6 +135,14 @@ body {
   font-weight: 600;
 }
 
+.rag-markdown img {
+  display: block;
+  max-width: min(240px, 100%);
+  height: auto;
+  margin: 0.75rem 0 0.25rem;
+  border-radius: 0.5rem;
+}
+
 .rag-markdown pre:not(.code-block-pre) {
   margin: 0;
   padding: 0;

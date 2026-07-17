@@ -98,7 +98,7 @@
 - **单用户 Token 配额**：按日估算用量（`USER_TOKEN_QUOTA_DAILY`），与 LLM 调用次数配额并存
 - **工具轮次 / 超时**：`AGENT_MAX_TOOL_ROUNDS`、`AGENT_REPLY_TIMEOUT_SECONDS` 限制单轮对话资源消耗
 - **熔断保护**：连续失败达阈值后短时拒绝新请求（`AGENT_CIRCUIT_BREAKER_*`）
-- **Prompt 版本与灰度**：外置 `app/prompts/unified_agent/v*.txt`，支持稳定版 + 按用户哈希灰度
+- **Prompt 版本与灰度**：外置 `app/prompts/prompts.yml`，支持稳定版 + 按用户哈希灰度
 - **模型按场景路由**：对话 / Rerank / 降级回退模型可分别配置（`OPENAI_MODEL_CHAT` 等）
 
 ---
@@ -168,7 +168,7 @@ HISTORY_MAX_MESSAGES=20
 HISTORY_COMPRESS_ENABLED=true
 HISTORY_COMPRESS_THRESHOLD=12
 HISTORY_KEEP_RECENT=8
-# Prompt 稳定版与灰度（文件：backend/app/prompts/unified_agent/{version}.txt）
+# Prompt 稳定版与灰度（文件：backend/app/prompts/prompts.yml）
 AGENT_PROMPT_VERSION=v1
 AGENT_PROMPT_CANARY_VERSION=v2
 AGENT_PROMPT_CANARY_PERCENT=10
@@ -180,4 +180,6 @@ OPENAI_MODEL_FALLBACK=sensenova-u1-fast
 
 ---
 
-> 更多部署与评测细节请参阅项目根目录 `README.md`。
+> 更多部署与评测细节请参阅项目根目录 `README.md`，或联系作者：
+
+![联系作者微信](/wechat.jpg)

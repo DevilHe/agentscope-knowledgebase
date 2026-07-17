@@ -8,6 +8,7 @@ declare module "*.md?raw" {
 interface ImportMetaEnv {
   readonly VITE_REGISTRATION_ENABLED?: string;
   readonly VITE_PASSWORD_ENCRYPT_KEY?: string;
+  readonly VITE_ICP_BEIAN?: string;
 }
 
 interface ImportMeta {

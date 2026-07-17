@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearAuth, fetchCaptcha, fetchPublicDepartments, register, type CaptchaInfo } from "../api/client";
 import ParticleWave from "../components/ParticleWave";
+import SiteBeianFooter from "../components/SiteBeianFooter";
 import { useIsMobile } from "../hooks/useIsMobile";
 import type { DepartmentItem } from "../types";
 import {
@@ -195,6 +196,7 @@ export default function RegisterPage() {
           <Link to="/login">已有账号？去登录</Link>
         </div>
       </Card>
+      <SiteBeianFooter light={isMobile} />
     </div>
   );
 }

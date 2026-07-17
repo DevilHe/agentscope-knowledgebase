@@ -118,7 +118,7 @@ class Settings(BaseSettings):
     user_token_quota_daily: int = 0  # 0 表示不限
     user_token_estimate_chars_per_token: float = 2.0
 
-    # Prompt 版本与灰度（文件位于 app/prompts/unified_agent/{version}.txt）
+    # Prompt 版本与灰度（正文见 app/prompts/prompts.yml → unified_agent.{version}）
     agent_prompt_version: str = "v1"
     agent_prompt_canary_version: str = ""
     agent_prompt_canary_percent: int = 0  # 0-100，按 user_id 哈希分流

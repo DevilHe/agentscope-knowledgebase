@@ -107,6 +107,7 @@ services:
       args:
         VITE_PASSWORD_ENCRYPT_KEY: ${VITE_PASSWORD_ENCRYPT_KEY}
         VITE_REGISTRATION_ENABLED: ${VITE_REGISTRATION_ENABLED:-false}
+        VITE_ICP_BEIAN: ${VITE_ICP_BEIAN:-}
     container_name: askb-frontend
     restart: unless-stopped
     environment:

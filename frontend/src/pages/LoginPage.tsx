@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchCaptcha, login, type CaptchaInfo } from "../api/client";
 import ParticleWave from "../components/ParticleWave";
+import SiteBeianFooter from "../components/SiteBeianFooter";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { isRegistrationEnabled } from "../utils/authPolicy";
 
@@ -144,6 +145,7 @@ export default function LoginPage() {
           </Form.Item>
         </Form>
       </Card>
+      <SiteBeianFooter light={isMobile} />
     </div>
   );
 }
