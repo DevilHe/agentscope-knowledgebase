@@ -51,13 +51,18 @@ def _execute_text(tool: str, raw_input: str = "", *, failed: bool = False) -> st
         return f"{base}（失败）" if failed else base
     if tool == "web_search":
         query = _truncate(str(parsed.get("query") or parsed.get("q") or ""))
-        base = f"联网搜索{f'：{query}' if query else ''}"
-        return f"{base}（失败）" if failed else base
-    if tool == "get_weather":
-        city = str(parsed.get("city") or "").strip()
         if failed:
-            return f"调用 weather 失败{f'（{city}）' if city else ''}"
-        return f"调用 weather 并返回结果{f'（{city}）' if city else ''}"
+            return f"调用 web_search 工具联网搜索失败{f'：{query}' if query else ''}"
+        return f"调用 web_search 工具联网搜索{f'：{query}' if query else ''}"
+    if tool == "get_weather":
+        cities = parsed.get("cities")
+        if isinstance(cities, list) and cities:
+            city_label = "、".join(str(c) for c in cities if c)
+        else:
+            city_label = str(parsed.get("city") or "").strip()
+        if failed:
+            return f"调用 get_weather 工具失败{f'（{city_label}）' if city_label else ''}"
+        return f"调用 get_weather 工具并返回结果{f'（{city_label}）' if city_label else ''}"
     return "执行工具失败" if failed else "执行工具"
 
 

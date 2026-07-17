@@ -1,26 +1,10 @@
 # -*- coding: utf-8 -*-
-"""向量侧封装：入库/检索走 Qdrant hybrid；AgentScope KnowledgeBase 仅作兼容保留。"""
+"""向量侧封装：入库/检索走自研 Qdrant hybrid。"""
 
-from agentscope.rag import KnowledgeBase
+from qdrant_client.http import models as qmodels
 
 from app.config import settings
-from app.services.embedder import get_embedder
-from app.services.vectorstore import get_vector_store
-
-_kb_cache: dict[str, KnowledgeBase] = {}
-
-
-def get_knowledge_base(knowledge_base: str) -> KnowledgeBase:
-    if knowledge_base not in _kb_cache:
-        _kb_cache[knowledge_base] = KnowledgeBase(
-            name=knowledge_base,
-            description=f"知识库 {knowledge_base}",
-            embedding_model=get_embedder(),
-            vector_store=get_vector_store(),
-            collection=settings.qdrant_collection,
-            metadata_filter={"knowledge_base": knowledge_base},
-        )
-    return _kb_cache[knowledge_base]
+from app.services.qdrant_hybrid import get_async_qdrant
 
 
 async def ensure_collection() -> None:
@@ -36,11 +20,23 @@ async def delete_doc_vectors(doc_id: str, knowledge_base: str) -> None:
 
     await hybrid_delete(doc_id)
 
-    # 旧版 AgentScope 入库写入 settings.qdrant_collection（如 standards）
-    store = get_vector_store()
-    client = store.get_client()
-    if await client.collection_exists(settings.qdrant_collection):
-        await store.delete(settings.qdrant_collection, doc_id)
+    # 清理旧版 dense-only collection（如 standards）
+    client = get_async_qdrant()
+    legacy = settings.qdrant_collection.strip() or "standards"
+    if await client.collection_exists(legacy):
+        await client.delete(
+            collection_name=legacy,
+            points_selector=qmodels.FilterSelector(
+                filter=qmodels.Filter(
+                    must=[
+                        qmodels.FieldCondition(
+                            key="doc_id",
+                            match=qmodels.MatchValue(value=doc_id),
+                        )
+                    ]
+                )
+            ),
+        )
 
 
 def vector_score_threshold() -> float:

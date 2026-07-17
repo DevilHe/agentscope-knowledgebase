@@ -1,14 +1,15 @@
 import asyncio
 from pathlib import Path
 
-from agentscope.rag import ApproxTokenChunker, PDFParser, TextParser
-
 from app.config import settings
 from app.db.models import Document as DocumentModel
 from app.db.models import SessionLocal
 from app.db.redis_client import set_task_status
+from app.ingest.chunkers.approx_token_chunker import ApproxTokenChunker
 from app.ingest.chunkers.semantic_token_chunker import SemanticTokenChunker
 from app.ingest.parsers.docx_parser import DocxParser
+from app.ingest.parsers.pdf_parser import PDFParser
+from app.ingest.parsers.text_parser import TextParser
 from app.services.chunk_store import delete_chunks_by_doc, insert_chunks
 from app.services.knowledge_base import delete_doc_vectors
 from app.services.qdrant_hybrid import upsert_chunks

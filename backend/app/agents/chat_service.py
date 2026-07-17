@@ -4,7 +4,6 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 
-from agentscope.message import Msg, TextBlock, UserMsg
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
@@ -20,6 +19,7 @@ from app.agents.governance import (
     record_agent_success,
     reply_timeout_seconds,
 )
+from app.agents.history_compress import compress_history_messages, rows_to_messages
 from app.audit.guard import check_sensitive_text, check_tool_quota, consume_tool_quota
 from app.audit.service import record_audit
 from app.config import settings
@@ -46,7 +46,8 @@ def ensure_session(db: Session, user_id: str, session_id: str | None) -> str:
     return sid
 
 
-def load_history_messages(db: Session, session_id: str, limit: int) -> list[Msg]:
+async def load_history_messages(db: Session, session_id: str, limit: int) -> list:
+    """加载会话历史；超阈值时压缩旧轮次为摘要 SystemMessage。"""
     rows = (
         db.query(ChatMessage)
         .filter(ChatMessage.session_id == session_id)
@@ -58,20 +59,8 @@ def load_history_messages(db: Session, session_id: str, limit: int) -> list[Msg]
     )
     if len(rows) > limit:
         rows = rows[-limit:]
-    messages: list[Msg] = []
-    for row in rows:
-        if row.role == "user":
-            messages.append(UserMsg(name="user", content=row.content))
-        elif row.role == "assistant":
-            messages.append(
-                Msg(
-                    name="assistant",
-                    content=[TextBlock(text=row.content)],
-                    role="assistant",
-                )
-            )
-    return messages
-
+    messages = rows_to_messages(rows)
+    return await compress_history_messages(messages)
 
 def save_messages(
     db: Session,
@@ -114,7 +103,7 @@ def save_messages(
 
 async def _consume_agent_stream(
     question: str,
-    history: list[Msg],
+    history: list,
     user: User,
     top_k: int,
     sources_collector: list[dict],
@@ -245,7 +234,7 @@ async def stream_rag_answer(
     )
 
     sid = ensure_session(db, user.id, session_id)
-    history = load_history_messages(db, sid, settings.history_max_messages)
+    history = await load_history_messages(db, sid, settings.history_max_messages)
 
     sources_collector: list[dict] = []
     chunks: list[str] = []

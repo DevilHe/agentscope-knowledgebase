@@ -1,14 +1,14 @@
-# AgentScope Knowledge Base
+# LangGraph Knowledge Base
 
-基于 **AgentScope 2.0** 的知识库 RAG 系统：JWT 登录、管理员文档管理、DeepSeek 风格聊天（含历史会话与 Agent 工具调用）。
+基于 **LangChain + LangGraph** 的知识库 RAG 系统：JWT 登录、管理员文档管理、DeepSeek 风格聊天（含历史会话与 Agent 工具调用）。
 
 ## 技术栈
 
-- **AgentScope**：LLM（OpenAIChatModel）、Embedding（Ollama）、向量库（QdrantStore）、Agent + Toolkit + 工具权限
-- **LLM**：商汤 SenseNova `deepseek-v4-flash`（`https://token.sensenova.cn/v1`）
-- **Embedding**：Ollama `nomic-embed-text`（768 维）
-- **Agent 工具**：`get_weather`（`ToolBase` + `PermissionEngine` 角色 allow 规则 + HITL 闭环）
-- **检索**：Qdrant dense+sparse 原生混合（payload 隔离）+ 可选 LLM Rerank；MySQL `document_chunks` 双写备份
+- **Agent**：LangGraph ReAct（`tools_condition` 按需检索）+ LangChain Tools
+- **LLM**：商汤 SenseNova `deepseek-v4-flash`（`https://token.sensenova.cn/v1`，OpenAI 兼容 / `langchain-openai`）
+- **Embedding**：Ollama `nomic-embed-text`（768 维，httpx 直连）
+- **Agent 工具**：`search_knowledge_base` / `web_search` / `get_weather`（多城一次传入 `cities`）+ 角色白名单
+- **检索**：自研 Qdrant dense+sparse 混合（payload 隔离）+ 可选 LLM Rerank；MySQL `document_chunks` 双写备份（**不用 RAGFlow**）
 - **文档分块**：默认语义分块（Ollama embedding 合并相邻句/条，单块目标 **512–1024 token**）；超长回退固定 token 切分
 - **后端**：FastAPI + MySQL + Redis + Qdrant
 - **前端**：React + Vite + Tailwind
@@ -437,9 +437,22 @@ CHUNK_SEMANTIC_SIMILARITY_THRESHOLD=0.60
 
 > 修改分块策略或参数后，需**重新上传**文档才会生效；已入库 chunk 不会自动重建。
 
+## 多轮历史压缩
+
+```env
+HISTORY_MAX_MESSAGES=20          # 从 DB 取最近多少条
+HISTORY_COMPRESS_ENABLED=true    # 是否启用 LLM 摘要
+HISTORY_COMPRESS_THRESHOLD=12    # 超过该条数才压缩
+HISTORY_KEEP_RECENT=8            # 压缩后保留的最近原文条数
+```
+
+流程：加载最近 N 条 → 若条数 > 阈值 → 旧轮次 LLM 摘要为一条 `SystemMessage` → 再拼最近 K 条原文 → 送入 Agent。关闭压缩或未超阈值时行为与原先截断一致。
+
 ## 说明
 
-- AgentScope **不提供**用户登录，本项目自研 JWT + RBAC
-- Word 解析为自研 `DocxParser`（AgentScope 内置无 Word 支持）
-- 聊天 SSE 协议与 langgraph-rag-standards 兼容：`intent` / `sources` / `token` / `done`
-- 通用对话（`general` 意图）走 AgentScope Agent：`ToolBase.check_permissions` → `PermissionEngine` → `RequireUserConfirmEvent` / 自动放行
+- 用户登录为自研 JWT + RBAC（与 Agent 框架解耦）
+- Word / PDF / 文本解析与分块均为自研管线，向量写入自研 Qdrant hybrid
+- 聊天 SSE 协议兼容：`intent` / `sources` / `token` / `cot` / `tool` / `done`
+- 按需检索：LangGraph ReAct 条件边（有 `tool_calls` → tools，否则直接结束）；普通闲聊不强制 RAG
+- 天气工具支持一次传入多城 `cities`（如北京+上海），内部并行查询，避免多次工具调用
+- 多轮历史：默认取最近 `HISTORY_MAX_MESSAGES` 条；超过 `HISTORY_COMPRESS_THRESHOLD` 时，用 LLM 将旧轮次压成一条摘要 SystemMessage，再拼上最近 `HISTORY_KEEP_RECENT` 条原文

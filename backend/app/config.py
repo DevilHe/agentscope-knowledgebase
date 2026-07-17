@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     top_k: int = 4
     score_threshold: float = 0.6
     history_max_messages: int = 20
+    # 历史压缩：超过阈值时用 LLM 摘要旧轮次，再拼最近若干条原文
+    history_compress_enabled: bool = True
+    history_compress_threshold: int = 12
+    history_keep_recent: int = 8
 
     # 混合检索：Qdrant dense+sparse（关闭则仅 dense）；可选 LLM Rerank
     retrieval_hybrid_enabled: bool = True

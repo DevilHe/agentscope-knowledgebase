@@ -1,6 +1,6 @@
 # AI 知识库助手
 
-基于 **AgentScope 2.0** 的企业级知识库 RAG 系统，支持文档问答、联网搜索、天气查询与多轮对话。
+基于 **LangChain + LangGraph** 的企业级知识库 RAG 系统，支持文档问答、联网搜索、天气查询与多轮对话。
 
 ---
 
@@ -8,10 +8,10 @@
 
 | 层级       | 技术                                                                          |
 | ---------- | ----------------------------------------------------------------------------- |
-| Agent 框架 | AgentScope 2.0（Agent、Toolkit、ToolBase、PermissionEngine）                  |
+| Agent 框架 | LangGraph ReAct（`tools_condition` 按需检索）+ LangChain Tools                |
 | 大语言模型 | 商汤 SenseNova `sensenova-6.7-flash-lite/sensenova-u1-fast/deepseek-v4-flash` |
 | 向量嵌入   | Ollama `nomic-embed-text`（768 维）                                           |
-| 向量数据库 | Qdrant                                                                        |
+| 向量数据库 | Qdrant（自研 dense+sparse hybrid，不用 RAGFlow）                              |
 | 全文检索   | Qdrant sparse（与 dense 同 collection 混合）                                  |
 | 后端       | FastAPI + SQLAlchemy + Redis                                                  |
 | 前端       | React 19 + Vite + Ant Design + Tailwind CSS                                   |
@@ -29,18 +29,18 @@
 - 可选 **LLM Rerank**：对 Top-N 候选 chunk 打分重排（因服务器 2C2G 限制，暂不支持 cross-encoder）
 - `RETRIEVAL_HYBRID_ENABLED=false` 时仅 dense 向量检索
 
-### 2. AgentScope 原生知识库封装
+### 2. 自研入库与分块
 
 - **语义分块**（默认 `CHUNK_STRATEGY=semantic`）：Ollama embedding 合并相邻句/条，单块目标 **512–1024 token**；超长回退固定 token 切
 - `CHUNK_STRATEGY=fixed` 时仅按 token 大小与 overlap 切分
-- `KnowledgeBase` 统一封装入库、向量化与检索流程
 - 文档 **版本管理**：同文件内容 hash 相同则跳过重复入库
 
-### 3. 可观测的 Agent 工具调用
+### 3. 可观测的 Agent 工具调用（按需）
 
 - 支持知识库检索、联网搜索、天气查询等工具
-- 基于 **PermissionEngine** 的角色权限与 HITL 闭环
-- 前端实时展示 **工具调用进度**（SSE 流式透出 ToolCall 事件）
+- **按需检索**：ReAct 条件边 — LLM 决定是否调用工具；闲聊不强制 RAG
+- 角色白名单控制可用工具；`get_weather` 支持一次传入多城 `cities`
+- 前端实时展示 **工具调用进度**（SSE 流式透出 tool / cot 事件）
 
 ### 4. 引用溯源与可信度
 
@@ -76,15 +76,16 @@
 #### 鉴权要点
 
 - 聊天时服务端校验知识库访问权，**禁止**客户端越权指定 KB
-- 向量检索（Qdrant）与 BM25（MySQL）均按 **可访问 doc_id** 过滤
+- 向量检索（Qdrant）按 **可访问 doc_id** 过滤
 - 文档列表、上传、删除均走 ACL 过滤
 - 用户管理支持分配部门，决定可访问的知识库范围
 
 ### 6. 完整的对话体验
 
-- 多会话历史管理（今天 / 昨天 / 更早分组）
+- 多会话历史管理（今天 / 昨天 / 一周内 / 一月内 / 更早按 `YYYY-MM` 分组）
 - Markdown 流式渲染，代码块语法高亮
 - 深度思考指示器与停止生成
+- **上下文压缩摘要**：历史超过阈值时，旧轮次由 LLM 压成一条摘要，再保留最近若干条原文送入 Agent
 
 ### 7. 本地 RAG 评测体系
 
@@ -107,8 +108,8 @@
 ```
 用户提问
   → FastAPI Chat API（SSE 流式）
-    → AgentScope Agent + Toolkit
-      → 工具：知识库检索 / 联网搜索 / 天气
+    → LangGraph ReAct Agent（条件边按需工具）
+      → 工具：知识库检索 / 联网搜索 / 多城天气
       → 混合检索：Qdrant dense+sparse（payload: org_id/kb/doc_id）→ 可选 LLM Rerank
     → 生成回答 + 引用来源
   → React 前端实时渲染
@@ -162,6 +163,11 @@ AGENT_CIRCUIT_BREAKER_COOLDOWN_SECONDS=120
 # 单用户每日 Token 估算配额（0=不限）
 USER_TOKEN_QUOTA_DAILY=0
 USER_TOKEN_ESTIMATE_CHARS_PER_TOKEN=2.0
+# 多轮历史窗口与压缩摘要
+HISTORY_MAX_MESSAGES=20
+HISTORY_COMPRESS_ENABLED=true
+HISTORY_COMPRESS_THRESHOLD=12
+HISTORY_KEEP_RECENT=8
 # Prompt 稳定版与灰度（文件：backend/app/prompts/unified_agent/{version}.txt）
 AGENT_PROMPT_VERSION=v1
 AGENT_PROMPT_CANARY_VERSION=v2

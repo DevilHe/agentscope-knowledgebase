@@ -1,7 +1,5 @@
-import asyncio
 import hashlib
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -13,6 +11,11 @@ from app.config import settings
 from app.db.models import Document, User, get_db
 from app.db.redis_client import get_task_status, set_task_status
 from app.ingest.pipeline import run_ingest
+from app.ingest.upload_paths import (
+    remove_stored_file,
+    resolve_stored_file,
+    stored_upload_path,
+)
 from app.ingest.upload_validation import validate_upload_content
 from app.services.acl import (
     VISIBILITY_DEPARTMENT,
@@ -115,7 +118,6 @@ async def upload_document(
     kb = assert_kb_write_access(db, admin, knowledge_base)
     scope = resolve_scope(db, admin)
     filename = file.filename or "unknown"
-    suffix = Path(filename).suffix.lower()
     ip = get_client_ip(request)
     user_agent = get_user_agent(request)
 
@@ -181,9 +183,7 @@ async def upload_document(
 
     doc_id = str(uuid.uuid4())
     task_id = str(uuid.uuid4())
-    upload_dir = settings.resolved_upload_dir
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    dest = upload_dir / f"{doc_id}{suffix}"
+    dest = stored_upload_path(knowledge_base, filename)
     dest.write_bytes(content)
 
     doc = Document(
@@ -292,9 +292,15 @@ async def update_document(
 
     if kb_changed and reingest:
         await delete_doc_vectors(doc_id, old_kb_slug)
-        upload_dir = settings.resolved_upload_dir
-        stored = next(upload_dir.glob(f"{doc_id}.*"), None)
+        stored = resolve_stored_file(doc.filename, old_kb_slug)
         if stored and stored.is_file():
+            # 知识库变更时把文件挪到新 kb 目录，仍保持原文件名
+            new_dest = stored_upload_path(doc.knowledge_base, doc.filename)
+            if stored.resolve() != new_dest.resolve():
+                new_dest.parent.mkdir(parents=True, exist_ok=True)
+                new_dest.write_bytes(stored.read_bytes())
+                stored.unlink(missing_ok=True)
+                stored = new_dest
             doc.status = "processing"
             task_id = str(uuid.uuid4())
             db.commit()
@@ -357,9 +363,18 @@ async def delete_document(
     await delete_doc_vectors(doc_id, doc.knowledge_base)
     delete_chunks_by_doc(db, doc_id)
 
-    upload_dir = settings.resolved_upload_dir
-    for path in upload_dir.glob(f"{doc_id}.*"):
-        path.unlink(missing_ok=True)
+    # 仅当没有其他文档仍引用同 kb + 同文件名时，才删除落盘文件
+    siblings = (
+        db.query(Document.id)
+        .filter(
+            Document.id != doc_id,
+            Document.filename == filename,
+            Document.knowledge_base == doc.knowledge_base,
+        )
+        .count()
+    )
+    if siblings == 0:
+        remove_stored_file(filename, doc.knowledge_base)
 
     db.delete(doc)
     db.commit()

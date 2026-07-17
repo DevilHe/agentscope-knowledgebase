@@ -348,8 +348,9 @@ export function useRagStream() {
         answer: currentAnswer,
       };
     } finally {
+      // 无论 UI 是否仍绑定，结束任务时都关掉 loading，避免光标/发送态卡住
+      setLoading(false);
       if (isUiAttached()) {
-        setLoading(false);
         setCotTrace((prev) => (prev.steps.length ? finalizeCotTrace(prev) : prev));
       }
       if (activeTaskRef.current?.controller === controller) {

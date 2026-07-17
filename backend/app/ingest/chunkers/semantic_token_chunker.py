@@ -11,9 +11,6 @@ import logging
 import math
 import re
 
-from agentscope.message import DataBlock, TextBlock
-from agentscope.rag import ApproxTokenChunker, Chunk, Section
-
 from app.config import settings
 from app.ingest.chunk_policy import (
     EMBED_BATCH_SIZE,
@@ -21,11 +18,12 @@ from app.ingest.chunk_policy import (
     chunk_min_tokens,
     chunk_min_unit_tokens,
 )
+from app.ingest.chunkers.approx_token_chunker import ApproxTokenChunker, approx_token_count
+from app.ingest.models import Chunk, Section, TextBlock
 from app.services.embedder import embed_texts
 
 logger = logging.getLogger(__name__)
 
-# 制度类「第X条」作为切分参考；过长的条再按句读切分（不在分号处切，避免 f）单句成块）
 _ARTICLE_BREAK = re.compile(r"(?=第[一二三四五六七八九十百零\d]+条)")
 _SENTENCE_END = re.compile(r"(?<=[。！？])")
 
@@ -49,10 +47,6 @@ def _merge_tiny_units(units: list[str], min_tokens: int) -> list[str]:
         merged.append(cur)
         i += 1
     return merged
-
-
-def approx_token_count(text: str) -> int:
-    return len(text.encode("utf-8")) // 4
 
 
 def split_semantic_units(text: str) -> list[str]:
@@ -120,25 +114,19 @@ class SemanticTokenChunker:
         self.min_chunk_tokens = (
             min_chunk_tokens if min_chunk_tokens is not None else chunk_min_tokens()
         )
-        self.embed_batch_size = embed_batch_size if embed_batch_size is not None else EMBED_BATCH_SIZE
+        self.embed_batch_size = (
+            embed_batch_size if embed_batch_size is not None else EMBED_BATCH_SIZE
+        )
         self._fixed = ApproxTokenChunker(chunk_size=self.chunk_size, overlap=self.overlap)
 
     async def chunk(self, sections: list[Section]) -> list[Chunk]:
         pieces: list[Chunk] = []
         for section in sections:
-            if isinstance(section.content, DataBlock):
-                pieces.append(
-                    Chunk(
-                        content=section.content,
-                        source=section.source,
-                        chunk_index=0,
-                        total_chunks=0,
-                        metadata=dict(section.metadata),
-                    )
-                )
-                continue
-
-            text = section.content.text if isinstance(section.content, TextBlock) else str(section.content)
+            text = (
+                section.content.text
+                if isinstance(section.content, TextBlock)
+                else str(section.content)
+            )
             text = (text or "").strip()
             if not text:
                 continue
@@ -187,7 +175,9 @@ class SemanticTokenChunker:
         groups = self._merge_undersized_groups(groups)
         return ["".join(g) for g in groups if "".join(g).strip()]
 
-    def _group_units(self, units: list[str], embeddings: list[list[float]]) -> list[list[str]]:
+    def _group_units(
+        self, units: list[str], embeddings: list[list[float]]
+    ) -> list[list[str]]:
         groups: list[list[str]] = [[units[0]]]
         for i in range(1, len(units)):
             sim = cosine_similarity(embeddings[i - 1], embeddings[i])
@@ -206,7 +196,6 @@ class SemanticTokenChunker:
         return groups
 
     def _merge_undersized_groups(self, groups: list[list[str]]) -> list[list[str]]:
-        """向后合并仍低于 min_chunk_tokens 的块（不超过 chunk_size）。"""
         if self.min_chunk_tokens <= 0 or len(groups) <= 1:
             return groups
 
@@ -217,7 +206,8 @@ class SemanticTokenChunker:
             while (
                 i + 1 < len(groups)
                 and approx_token_count("".join(current)) < self.min_chunk_tokens
-                and approx_token_count("".join(current) + "".join(groups[i + 1])) <= self.chunk_size
+                and approx_token_count("".join(current) + "".join(groups[i + 1]))
+                <= self.chunk_size
             ):
                 i += 1
                 current.extend(groups[i])

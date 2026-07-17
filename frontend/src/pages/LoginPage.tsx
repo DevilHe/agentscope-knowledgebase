@@ -1,8 +1,9 @@
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, Button, Card, Form, Input, Typography } from "antd";
+import { Button, Card, Form, Input, Typography, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchCaptcha, login, type CaptchaInfo } from "../api/client";
+import ParticleWave from "../components/ParticleWave";
 import { isRegistrationEnabled } from "../utils/authPolicy";
 
 const { Title } = Typography;
@@ -10,7 +11,6 @@ const { Title } = Typography;
 export default function LoginPage() {
   const navigate = useNavigate();
   const [form] = Form.useForm();
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [captcha, setCaptcha] = useState<CaptchaInfo | null>(null);
   const registrationEnabled = isRegistrationEnabled();
@@ -32,7 +32,7 @@ export default function LoginPage() {
         form.setFieldValue("captcha_answer", "");
       } catch (err) {
         if (!active) return;
-        setError((err as Error).message);
+        message.error((err as Error).message || "验证码加载失败");
       }
     })();
 
@@ -48,28 +48,30 @@ export default function LoginPage() {
   }) => {
     if (!captcha) return;
     setLoading(true);
-    setError("");
     try {
       await login(values.username, values.password, captcha.captcha_id, values.captcha_answer);
       navigate("/chat", { replace: true });
     } catch (err) {
-      setError((err as Error).message || "登录失败");
-      await loadCaptcha();
+      message.error((err as Error).message || "登录失败");
+      await loadCaptcha().catch((e) => message.error((e as Error).message));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-100 px-4">
-      <Card className="w-full max-w-sm shadow-sm" variant="borderless">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1220] px-4">
+      <ParticleWave color={0x7dd3fc} amountX={50} amountY={50} />
+      <Card
+        className="relative z-10 w-full max-w-sm border border-white/10 bg-white/95 shadow-xl backdrop-blur-sm"
+        variant="borderless"
+      >
         <div className="mb-4 flex items-center justify-center gap-3">
           <img src="/avatar.png" alt="AI知识库助手" className="h-16 w-16 shrink-0 object-contain" />
           <Title level={2} className="!mb-0">
             AI知识库助手
           </Title>
         </div>
-        {error && <Alert type="error" message={error} showIcon className="!mb-4" />}
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
             label="用户名"
@@ -103,7 +105,9 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="h-11 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-neutral-200 bg-white"
-                onClick={() => loadCaptcha().catch((e) => setError((e as Error).message))}
+                onClick={() =>
+                  loadCaptcha().catch((e) => message.error((e as Error).message || "验证码刷新失败"))
+                }
                 aria-label="刷新验证码"
               >
                 {captcha?.image ? (

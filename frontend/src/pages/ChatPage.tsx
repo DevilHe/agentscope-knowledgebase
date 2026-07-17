@@ -32,23 +32,56 @@ import { buildInitialCotTrace, finalizeCotTrace } from "../utils/cotTrace";
 const { Sider, Content } = Layout;
 const { Text } = Typography;
 
+function pad2(n: number) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function monthLabel(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+/** 侧边栏会话分组：今天 / 昨天 / 一周内 / 一月内 / 超出则按 YYYY-MM */
 function groupSessions(sessions: SessionItem[]) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const groups: { label: string; items: SessionItem[] }[] = [
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date(today);
+  monthAgo.setDate(monthAgo.getDate() - 30);
+
+  const fixed: { label: string; items: SessionItem[] }[] = [
     { label: "今天", items: [] },
     { label: "昨天", items: [] },
-    { label: "更早", items: [] },
+    { label: "一周内", items: [] },
+    { label: "一月内", items: [] },
   ];
+  const monthBuckets = new Map<string, SessionItem[]>();
+
   for (const s of sessions) {
     const t = s.updated_at ? new Date(s.updated_at) : new Date();
-    if (t >= today) groups[0].items.push(s);
-    else if (t >= yesterday) groups[1].items.push(s);
-    else groups[2].items.push(s);
+    if (t >= today) {
+      fixed[0].items.push(s);
+    } else if (t >= yesterday) {
+      fixed[1].items.push(s);
+    } else if (t >= weekAgo) {
+      fixed[2].items.push(s);
+    } else if (t >= monthAgo) {
+      fixed[3].items.push(s);
+    } else {
+      const key = monthLabel(t);
+      const list = monthBuckets.get(key);
+      if (list) list.push(s);
+      else monthBuckets.set(key, [s]);
+    }
   }
-  return groups.filter((g) => g.items.length > 0);
+
+  const monthGroups = [...monthBuckets.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+    .map(([label, items]) => ({ label, items }));
+
+  return [...fixed, ...monthGroups].filter((g) => g.items.length > 0);
 }
 
 export default function ChatPage() {
@@ -161,6 +194,25 @@ export default function ChatPage() {
       )
     );
   }, [streamingId, loading, answer, cotTrace]);
+
+  // 流结束后强制关掉打字光标，避免 loading 已结束但 message.streaming 仍为 true
+  useEffect(() => {
+    if (loading) return;
+    setStreamingId(null);
+    streamingAssistRef.current = null;
+    setMessages((prev) => {
+      if (!prev.some((m) => m.streaming)) return prev;
+      return prev.map((m) =>
+        m.streaming
+          ? {
+              ...m,
+              streaming: false,
+              cot: m.cot && m.cot.steps.length ? finalizeCotTrace(m.cot) : m.cot,
+            }
+          : m
+      );
+    });
+  }, [loading]);
 
   const onStop = useCallback(() => {
     const assistId = streamingAssistRef.current;
@@ -450,7 +502,10 @@ export default function ChatPage() {
                               />
                             )}
                             {liveContent.trim() ? (
-                              <MarkdownView content={liveContent} streaming={!!m.streaming} />
+                              <MarkdownView
+                                content={liveContent}
+                                streaming={Boolean(m.streaming && loading && m.id === streamingId)}
+                              />
                             ) : null}
                           </>
                         ) : (

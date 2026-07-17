@@ -5,6 +5,7 @@ eval/results/
 backend/.venv/
 frontend/node_modules/
 frontend/dist/
+frontend/.corepack/
 __pycache__/
 *.pyc
 .DS_Store

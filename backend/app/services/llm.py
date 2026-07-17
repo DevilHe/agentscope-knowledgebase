@@ -1,19 +1,13 @@
+"""LLM 封装：OpenAI 兼容 Chat（LangChain ChatOpenAI）。"""
+
 from collections.abc import AsyncIterator
 
-from agentscope.credential import OpenAICredential
-from agentscope.message import Msg, UserMsg
-from agentscope.model import OpenAIChatModel
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 from app.config import settings
 
-_MODEL_CACHE: dict[tuple[str, bool], OpenAIChatModel] = {}
-
-
-def _credential() -> OpenAICredential:
-    return OpenAICredential(
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
-    )
+_MODEL_CACHE: dict[tuple[str, bool], ChatOpenAI] = {}
 
 
 def resolve_model_name(scene: str = "chat") -> str:
@@ -32,64 +26,55 @@ def get_chat_model(
     stream: bool = True,
     model_name: str | None = None,
     scene: str = "chat",
-) -> OpenAIChatModel:
+) -> ChatOpenAI:
     name = model_name or resolve_model_name(scene)
     key = (name, stream)
     cached = _MODEL_CACHE.get(key)
     if cached is not None:
         return cached
-    model = OpenAIChatModel(
-        credential=_credential(),
+    model = ChatOpenAI(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url,
         model=name,
-        stream=stream,
-        parameters=OpenAIChatModel.Parameters(temperature=0),
+        temperature=0,
+        streaming=stream,
     )
     _MODEL_CACHE[key] = model
     return model
 
 
-def _extract_text(chunk) -> str:
-    parts: list[str] = []
-    for block in chunk.content or []:
-        text = getattr(block, "text", None)
-        if text:
-            parts.append(text)
-    return "".join(parts)
-
-
 async def invoke_text(prompt: str, *, scene: str = "chat") -> str:
     model = get_chat_model(stream=False, scene=scene)
-    response = await model([UserMsg(name="user", content=prompt)])
-    if hasattr(response, "content"):
-        return _extract_text(response)
-    return str(response)
+    response = await model.ainvoke([HumanMessage(content=prompt)])
+    content = response.content
+    if isinstance(content, str):
+        return content
+    return str(content)
 
 
 async def stream_text(prompt: str, *, scene: str = "chat") -> AsyncIterator[str]:
     model = get_chat_model(stream=True, scene=scene)
-    stream_gen = await model([UserMsg(name="user", content=prompt)])
-    async for chunk in stream_gen:
-        delta = _extract_text(chunk)
-        if delta:
+    async for chunk in model.astream([HumanMessage(content=prompt)]):
+        delta = chunk.content
+        if isinstance(delta, str) and delta:
             yield delta
 
 
 async def stream_with_history(
     system_prompt: str,
-    history: list[Msg],
+    history: list,
     user_prompt: str,
     *,
     scene: str = "chat",
     model_name: str | None = None,
 ) -> AsyncIterator[str]:
     model = get_chat_model(stream=True, scene=scene, model_name=model_name)
-    messages: list[Msg] = []
+    messages: list = []
     if system_prompt:
-        messages.append(Msg(name="system", content=system_prompt, role="system"))
+        messages.append(SystemMessage(content=system_prompt))
     messages.extend(history)
-    messages.append(UserMsg(name="user", content=user_prompt))
-    stream_gen = await model(messages)
-    async for chunk in stream_gen:
-        delta = _extract_text(chunk)
-        if delta:
+    messages.append(HumanMessage(content=user_prompt))
+    async for chunk in model.astream(messages):
+        delta = chunk.content
+        if isinstance(delta, str) and delta:
             yield delta

@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="AgentScope Knowledge Base", lifespan=lifespan)
+app = FastAPI(title="LangGraph Knowledge Base", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

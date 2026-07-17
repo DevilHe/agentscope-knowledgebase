@@ -4,12 +4,10 @@
 import io
 from pathlib import Path
 
-from agentscope.message import TextBlock
-from agentscope.rag._document import Section
-from agentscope.rag._parser._base import ParserBase
+from app.ingest.models import Section, TextBlock
 
 
-class DocxParser(ParserBase):
+class DocxParser:
     supported_media_types = [
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ]
