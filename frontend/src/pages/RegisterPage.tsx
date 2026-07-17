@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearAuth, fetchCaptcha, fetchPublicDepartments, register, type CaptchaInfo } from "../api/client";
 import ParticleWave from "../components/ParticleWave";
+import { useIsMobile } from "../hooks/useIsMobile";
 import type { DepartmentItem } from "../types";
 import {
   AUTH_PASSWORD_POLICY,
@@ -18,6 +19,7 @@ const { Title } = Typography;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [form] = Form.useForm();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -85,15 +87,23 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1220] px-4">
-      <ParticleWave color={0x7dd3fc} amountX={50} amountY={50} />
+    <div
+      className={`relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] ${
+        isMobile ? "bg-neutral-50" : "bg-[#0b1220]"
+      }`}
+    >
+      {!isMobile && <ParticleWave color={0x7dd3fc} amountX={50} amountY={50} />}
       <Card
-        className="relative z-10 w-full max-w-sm border border-white/10 bg-white/95 shadow-xl backdrop-blur-sm"
+        className={`relative z-10 w-full max-w-sm shadow-xl ${
+          isMobile
+            ? "border border-neutral-200 bg-white"
+            : "border border-white/10 bg-white/95 backdrop-blur-sm"
+        }`}
         variant="borderless"
       >
-        <div className="mb-4 flex items-center justify-center gap-3">
-          <img src="/avatar.png" alt="AI知识库助手" className="h-16 w-16 shrink-0 object-contain" />
-          <Title level={2} className="!mb-0">
+        <div className="mb-4 flex items-center justify-center gap-2 sm:gap-3">
+          <img src="/avatar.png" alt="AI知识库助手" className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16" />
+          <Title level={2} className="!mb-0 !text-xl sm:!text-2xl">
             注册账号
           </Title>
         </div>

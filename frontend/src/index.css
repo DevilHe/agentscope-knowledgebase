@@ -1,8 +1,25 @@
 @import "tailwindcss";
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* 避免 iOS 横向橡皮筋与输入框缩放抖动 */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+/* 聊天主壳：优先用 dvh，兼容旧浏览器用 100vh */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .chat-composer {
@@ -11,6 +28,23 @@ body {
   background: #fff;
   padding: 12px 16px 10px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+@media (max-width: 768px) {
+  .chat-composer {
+    border-radius: 14px;
+    padding: 10px 12px 8px;
+  }
+
+  .rag-markdown {
+    font-size: 0.9375rem;
+  }
+
+  .rag-markdown table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .chat-composer .ant-input,

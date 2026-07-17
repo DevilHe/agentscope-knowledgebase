@@ -87,10 +87,10 @@ export default function AdminAuditPage() {
     <Layout className="min-h-screen bg-neutral-50">
       <PageHeader title="审计日志" />
 
-      <Content className="p-6">
+      <Content className="p-3 md:p-6">
         <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3">
-            <div className="flex min-w-0 flex-nowrap items-center gap-3">
+          <div className="flex flex-col gap-3 border-b border-neutral-200 px-3 py-3 md:flex-row md:items-center md:justify-between md:px-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
               <Select
                 allowClear
                 placeholder="操作类型"
@@ -144,6 +144,7 @@ export default function AdminAuditPage() {
             loading={loading}
             columns={columns}
             dataSource={logs}
+            scroll={{ x: 1000 }}
             pagination={{
               current: page,
               pageSize,

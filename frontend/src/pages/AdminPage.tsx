@@ -219,16 +219,16 @@ export default function AdminPage() {
     <Layout className="min-h-screen bg-neutral-50">
       <PageHeader title="文档管理" />
 
-      <Content className="p-6">
+      <Content className="p-3 md:p-6">
         <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-3">
+          <div className="flex flex-col gap-3 border-b border-neutral-200 px-3 py-3 sm:flex-row sm:items-center sm:justify-between md:px-4">
             <Input.Search
               allowClear
               placeholder="搜索文档名称"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onSearch={setKeyword}
-              className="max-w-sm"
+              className="w-full max-w-sm"
             />
             <DocUpload
               onUploaded={loadDocs}
@@ -243,6 +243,7 @@ export default function AdminPage() {
             columns={columns}
             dataSource={filteredDocs}
             pagination={pagination}
+            scroll={{ x: 900 }}
             onChange={(pager) => setPagination((prev) => ({ ...prev, ...pager }))}
             locale={{ emptyText: keyword ? "未找到匹配的文档" : "暂无文档" }}
           />

@@ -4,6 +4,7 @@ import type { MenuProps } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchMe, getStoredUser, logout, updateStoredUser } from "../api/client";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { formatAccountLabel } from "../utils/accountLabel";
 import ChangePasswordModal from "./ChangePasswordModal";
 
@@ -19,10 +20,12 @@ export default function UserAccount({
   variant = "sidebar",
 }: UserAccountProps) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const user = getStoredUser();
   const [accountLabel, setAccountLabel] = useState(
     () => formatAccountLabel(user?.role || "user", user?.department_names)
   );
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
 
   useEffect(() => {
@@ -37,9 +40,16 @@ export default function UserAccount({
       .catch(() => undefined);
   }, [user?.role, user?.username]);
 
+  useEffect(() => {
+    if (pwdOpen) setMenuOpen(false);
+  }, [pwdOpen]);
+
   if (!user) return null;
 
+  const closeMenu = () => setMenuOpen(false);
+
   const onLogout = async () => {
+    closeMenu();
     await logout();
     window.location.href = "/login";
   };
@@ -50,14 +60,20 @@ export default function UserAccount({
     key: "about",
     icon: <BookOutlined />,
     label: "说明文档",
-    onClick: () => navigate("/about"),
+    onClick: () => {
+      closeMenu();
+      navigate("/about");
+    },
   });
 
   items.push({
     key: "admin",
     icon: <SettingOutlined />,
     label: "文档管理",
-    onClick: () => navigate("/admin"),
+    onClick: () => {
+      closeMenu();
+      navigate("/admin");
+    },
   });
 
   if (user.role === "admin") {
@@ -65,13 +81,19 @@ export default function UserAccount({
       key: "users",
       icon: <TeamOutlined />,
       label: "用户管理",
-      onClick: () => navigate("/admin/users"),
+      onClick: () => {
+        closeMenu();
+        navigate("/admin/users");
+      },
     });
     items.push({
       key: "audit",
       icon: <AuditOutlined />,
       label: "审计日志",
-      onClick: () => navigate("/admin/audit"),
+      onClick: () => {
+        closeMenu();
+        navigate("/admin/audit");
+      },
     });
   }
 
@@ -79,7 +101,10 @@ export default function UserAccount({
     key: "password",
     icon: <KeyOutlined />,
     label: "修改密码",
-    onClick: () => setPwdOpen(true),
+    onClick: () => {
+      closeMenu();
+      setPwdOpen(true);
+    },
   });
 
   items.push({
@@ -98,7 +123,16 @@ export default function UserAccount({
     <>
       <Dropdown
         menu={{ items }}
-        trigger={["hover"]}
+        open={menuOpen}
+        onOpenChange={(next) => {
+          // 改密弹窗打开时禁止下拉再次弹出（移动端 hover/touch 残留）
+          if (pwdOpen) {
+            setMenuOpen(false);
+            return;
+          }
+          setMenuOpen(next);
+        }}
+        trigger={isMobile ? ["click"] : ["hover"]}
         placement={menuPlacement === "top" ? "topLeft" : "bottomRight"}
         mouseEnterDelay={0.15}
         mouseLeaveDelay={0.25}

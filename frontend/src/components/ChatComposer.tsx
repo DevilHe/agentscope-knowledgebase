@@ -9,6 +9,8 @@ type ChatComposerProps = {
   onChange: (value: string) => void;
   onSend: () => void;
   onStop: () => void;
+  /** 移动端更紧凑的行数 */
+  compact?: boolean;
 };
 
 export default function ChatComposer({
@@ -17,6 +19,7 @@ export default function ChatComposer({
   onChange,
   onSend,
   onStop,
+  compact = false,
 }: ChatComposerProps) {
   const canSend = value.trim().length > 0 && !loading;
 
@@ -27,14 +30,16 @@ export default function ChatComposer({
         onChange={(e) => onChange(e.target.value)}
         placeholder="给AI助手发送消息"
         variant="borderless"
-        autoSize={{ minRows: 2, maxRows: 8 }}
+        autoSize={{ minRows: compact ? 1 : 2, maxRows: compact ? 5 : 8 }}
         onPressEnter={(e) => {
+          // 移动端 Enter 常用于换行；桌面 Enter 发送、Shift+Enter 换行
+          if (compact) return;
           if (!e.shiftKey && canSend) {
             e.preventDefault();
             onSend();
           }
         }}
-        className="!px-0 !py-0 !text-[15px] !leading-relaxed"
+        className="!px-0 !py-0 !text-[16px] !leading-relaxed md:!text-[15px]"
       />
       <div className="chat-composer-footer">
         {loading ? (
@@ -42,19 +47,22 @@ export default function ChatComposer({
             type="primary"
             shape="circle"
             danger
+            size="large"
             icon={<PauseOutlined />}
             onClick={onStop}
             aria-label="停止生成"
+            className="!h-11 !w-11"
           />
         ) : (
           <Button
             type="primary"
             shape="circle"
+            size="large"
             icon={<ArrowUpOutlined />}
             disabled={!canSend}
             onClick={onSend}
             aria-label="发送"
-            className={canSend ? "chat-send-active" : "chat-send-idle"}
+            className={`!h-11 !w-11 ${canSend ? "chat-send-active" : "chat-send-idle"}`}
           />
         )}
       </div>

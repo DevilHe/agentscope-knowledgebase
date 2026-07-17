@@ -1,4 +1,5 @@
 import { Drawer, Tooltip, Typography } from "antd";
+import { useIsMobile } from "../hooks/useIsMobile";
 import type { SourceDoc } from "../types";
 import { splitHighlightText } from "../utils/highlight";
 
@@ -69,11 +70,12 @@ export default function SourceDrawer({
   highlightQuery?: string;
   onClose: () => void;
 }) {
+  const isMobile = useIsMobile();
   return (
     <Drawer
       title={`引用来源 (${sources.length})`}
       placement="right"
-      size={680}
+      width={isMobile ? "100%" : 680}
       open={open}
       onClose={onClose}
     >

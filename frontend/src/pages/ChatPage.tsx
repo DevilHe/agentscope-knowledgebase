@@ -1,9 +1,11 @@
 import {
   DeleteOutlined,
+  MenuOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
 import {
   Button,
+  Drawer,
   Layout,
   Popconfirm,
   Typography,
@@ -24,6 +26,7 @@ import ChatComposer from "../components/ChatComposer";
 import MarkdownView from "../components/MarkdownView";
 import SourceDrawer from "../components/SourceDrawer";
 import UserAccount from "../components/UserAccount";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { useRagStream } from "../hooks/useRagStream";
 import type { ChatItem, SessionItem, SourceDoc } from "../types";
 import { buildWelcomeHint } from "../utils/chatWelcomeExample";
@@ -90,6 +93,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sessionNavOpen, setSessionNavOpen] = useState(false);
   const [drawerSources, setDrawerSources] = useState<SourceDoc[]>([]);
   const [drawerHighlightQuery, setDrawerHighlightQuery] = useState("");
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -99,7 +103,8 @@ export default function ChatPage() {
   const [departmentNames, setDepartmentNames] = useState<string[]>(
     () => getStoredUser()?.department_names || []
   );
-  const { answer, sources, showSources, cotTrace, loading, sessionId, ask, stop, detach, stopIfSession, reset, setActiveSession } = useRagStream();
+  const { answer, sources: _sources, showSources: _showSources, cotTrace, loading, sessionId, ask, stop, detach, stopIfSession, reset, setActiveSession } = useRagStream();
+  const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialSessionRef = useRef(searchParams.get("session"));
   const bootstrappedRef = useRef(false);
@@ -238,12 +243,19 @@ export default function ChatPage() {
   }, [messages, answer, cotTrace, loading, scrollToBottom]);
 
   const onSelectSession = (id: string) => {
-    if (id === activeSessionId) return;
+    if (id === activeSessionId) {
+      setSessionNavOpen(false);
+      return;
+    }
     void loadSessionById(id);
+    setSessionNavOpen(false);
   };
 
   const onNewChat = () => {
-    if (messages.length === 0 && !activeSessionId && !loading) return;
+    if (messages.length === 0 && !activeSessionId && !loading) {
+      setSessionNavOpen(false);
+      return;
+    }
     if (loading) detach();
     loadingSessionRef.current = null;
     streamingAssistRef.current = null;
@@ -252,6 +264,7 @@ export default function ChatPage() {
     reset();
     setMessages([]);
     setSearchParams({}, { replace: true });
+    setSessionNavOpen(false);
   };
 
   const onDeleteSession = async (id: string) => {
@@ -379,83 +392,126 @@ export default function ChatPage() {
   const grouped = useMemo(() => groupSessions(sessions), [sessions]);
   const welcomeHint = useMemo(() => buildWelcomeHint(departmentNames), [departmentNames]);
 
-  return (
-    <Layout className="h-screen bg-white">
-      <Sider width={260} theme="light" className="!bg-neutral-50 border-r border-neutral-200">
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-center gap-1.5 px-4 pb-1 pt-4">
-            <img
-              src="/avatar.png"
-              alt="AI知识库助手"
-              className="h-9 w-9 shrink-0 object-contain"
-            />
-            <span className="text-sm font-semibold text-neutral-800">AI知识库助手</span>
-          </div>
-          <div className="p-3 pt-2">
-            <Button block icon={<PlusOutlined />} onClick={onNewChat}>
-              新对话
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-2">
-            {grouped.map((g) => (
-              <div key={g.label} className="mb-3">
-                <Text type="secondary" className="block px-2 py-1 text-xs">
-                  {g.label}
-                </Text>
-                {g.items.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`group mb-0.5 flex items-center rounded-lg ${
-                      activeSessionId === s.id ? "bg-neutral-200" : "hover:bg-neutral-100"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onSelectSession(s.id)}
-                      className="min-w-0 flex-1 cursor-pointer truncate px-3 py-2 text-left text-sm text-neutral-700"
-                    >
-                      {s.title}
-                    </button>
-                    <Popconfirm
-                      title="确认删除该对话？"
-                      okText="删除"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => onDeleteSession(s.id)}
-                    >
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        aria-label="删除对话"
-                        className="mr-1 opacity-0 transition-opacity group-hover:opacity-100"
-                      />
-                    </Popconfirm>
-                  </div>
-                ))}
+  const sessionPanel = (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-center gap-1.5 px-4 pb-1 pt-4">
+        <img src="/avatar.png" alt="AI知识库助手" className="h-9 w-9 shrink-0 object-contain" />
+        <span className="text-sm font-semibold text-neutral-800">AI知识库助手</span>
+      </div>
+      <div className="p-3 pt-2">
+        <Button block icon={<PlusOutlined />} onClick={onNewChat}>
+          新对话
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-2 pb-2">
+        {grouped.map((g) => (
+          <div key={g.label} className="mb-3">
+            <Text type="secondary" className="block px-2 py-1 text-xs">
+              {g.label}
+            </Text>
+            {g.items.map((s) => (
+              <div
+                key={s.id}
+                className={`group mb-0.5 flex items-center rounded-lg ${
+                  activeSessionId === s.id ? "bg-neutral-200" : "hover:bg-neutral-100"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelectSession(s.id)}
+                  className="min-w-0 flex-1 cursor-pointer truncate px-3 py-2.5 text-left text-sm text-neutral-700"
+                >
+                  {s.title}
+                </button>
+                <Popconfirm
+                  title="确认删除该对话？"
+                  okText="删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => onDeleteSession(s.id)}
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    aria-label="删除对话"
+                    className="mr-1 opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100"
+                  />
+                </Popconfirm>
               </div>
             ))}
           </div>
-          <div className="border-t border-neutral-200 p-3">
-            <UserAccount />
-          </div>
-        </div>
-      </Sider>
+        ))}
+      </div>
+      <div className="border-t border-neutral-200 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <UserAccount />
+      </div>
+    </div>
+  );
+
+  return (
+    <Layout className="app-shell bg-white">
+      {!isMobile && (
+        <Sider
+          width={260}
+          theme="light"
+          className="!bg-neutral-50 border-r border-neutral-200"
+          breakpoint="md"
+        >
+          {sessionPanel}
+        </Sider>
+      )}
+
+      {isMobile && (
+        <Drawer
+          title={null}
+          placement="left"
+          width={Math.min(300, typeof window !== "undefined" ? window.innerWidth * 0.86 : 300)}
+          open={sessionNavOpen}
+          onClose={() => setSessionNavOpen(false)}
+          styles={{ body: { padding: 0 }, header: { display: "none" } }}
+          destroyOnClose={false}
+        >
+          {sessionPanel}
+        </Drawer>
+      )}
 
       <Layout className="flex min-h-0 flex-1 flex-col bg-white">
+        {isMobile && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              aria-label="打开历史会话"
+              onClick={() => setSessionNavOpen(true)}
+              className="!flex h-10 w-10 items-center justify-center"
+            />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800">
+              AI知识库助手
+            </span>
+            <Button
+              type="text"
+              icon={<PlusOutlined />}
+              aria-label="新对话"
+              onClick={onNewChat}
+              className="!flex h-10 w-10 items-center justify-center"
+            />
+          </div>
+        )}
+
         <Content className="flex min-h-0 flex-1 flex-col">
           {messages.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-6 pb-6">
-              <div className="mb-8 flex flex-col items-center gap-4 px-4 text-center">
-                <div className="flex items-center gap-5">
+            <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6">
+              <div className="mb-6 flex flex-col items-center gap-3 px-2 text-center md:mb-8 md:gap-4">
+                <div className="flex flex-col items-center gap-3 md:flex-row md:gap-5">
                   <img
                     src="/avatar.png"
                     alt="AI助手"
-                    className="h-28 w-28 shrink-0 object-contain"
+                    className="h-20 w-20 shrink-0 object-contain md:h-28 md:w-28"
                   />
-                  <span className="text-2xl font-bold">嗨，我是AI知识库助手</span>
+                  <span className="text-xl font-bold md:text-2xl">嗨，我是AI知识库助手</span>
                 </div>
-                <Text type="secondary" className="max-w-xl text-base leading-relaxed">
+                <Text type="secondary" className="max-w-xl text-sm leading-relaxed md:text-base">
                   {welcomeHint}
                 </Text>
               </div>
@@ -466,13 +522,14 @@ export default function ChatPage() {
                   onChange={setQuestion}
                   onSend={onSend}
                   onStop={onStop}
+                  compact={isMobile}
                 />
               </div>
             </div>
           ) : (
             <>
-              <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
-                <div className="mx-auto max-w-3xl space-y-6">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-6">
+                <div className="mx-auto max-w-3xl space-y-4 md:space-y-6">
                   {messages.map((m) => {
                     const isLiveAssist =
                       m.id === streamingId || m.id === streamingAssistRef.current;
@@ -485,53 +542,59 @@ export default function ChatPage() {
                     const showCot = Boolean(liveCot && liveCot.steps.length > 0);
 
                     return (
-                    <div key={m.id} className={m.role === "user" ? "flex justify-end" : ""}>
-                      <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                          m.role === "user"
-                            ? "bg-[#4d6bfe] text-white"
-                            : "bg-neutral-100 text-neutral-800"
-                        }`}
-                      >
-                        {m.role === "assistant" ? (
-                          <>
-                            {showCot && liveCot && (
-                              <ChainOfThought
-                                trace={liveCot}
-                                streaming={loading && !liveCot.finished}
-                              />
+                      <div key={m.id} className={m.role === "user" ? "flex justify-end" : ""}>
+                        <div
+                          className={`max-w-[92%] rounded-2xl px-3 py-2.5 md:max-w-[85%] md:px-4 md:py-3 ${
+                            m.role === "user"
+                              ? "bg-[#4d6bfe] text-white"
+                              : "bg-neutral-100 text-neutral-800"
+                          }`}
+                        >
+                          {m.role === "assistant" ? (
+                            <>
+                              {showCot && liveCot && (
+                                <ChainOfThought
+                                  trace={liveCot}
+                                  streaming={loading && !liveCot.finished}
+                                />
+                              )}
+                              {liveContent.trim() ? (
+                                <MarkdownView
+                                  content={liveContent}
+                                  streaming={Boolean(
+                                    m.streaming && loading && m.id === streamingId
+                                  )}
+                                />
+                              ) : null}
+                            </>
+                          ) : (
+                            <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                          )}
+                          {m.role === "assistant" &&
+                            !m.streaming &&
+                            m.show_sources &&
+                            m.sources &&
+                            m.sources.length > 0 && (
+                              <Button
+                                type="link"
+                                size="small"
+                                className="!px-0 !text-[#4d6bfe]"
+                                onClick={() => {
+                                  setDrawerSources(m.sources!);
+                                  setDrawerHighlightQuery(findQuestionForAssistant(m.id));
+                                  setDrawerOpen(true);
+                                }}
+                              >
+                                查看 {m.sources.length} 条引用
+                              </Button>
                             )}
-                            {liveContent.trim() ? (
-                              <MarkdownView
-                                content={liveContent}
-                                streaming={Boolean(m.streaming && loading && m.id === streamingId)}
-                              />
-                            ) : null}
-                          </>
-                        ) : (
-                          <span className="whitespace-pre-wrap">{m.content}</span>
-                        )}
-                        {m.role === "assistant" && !m.streaming && m.show_sources && m.sources && m.sources.length > 0 && (
-                          <Button
-                            type="link"
-                            size="small"
-                            className="!px-0 !text-[#4d6bfe]"
-                            onClick={() => {
-                              setDrawerSources(m.sources!);
-                              setDrawerHighlightQuery(findQuestionForAssistant(m.id));
-                              setDrawerOpen(true);
-                            }}
-                          >
-                            查看 {m.sources.length} 条引用
-                          </Button>
-                        )}
+                        </div>
                       </div>
-                    </div>
                     );
                   })}
                 </div>
               </div>
-              <div className="px-6 pb-6 pt-2">
+              <div className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:px-6 md:pb-6">
                 <div className="mx-auto max-w-3xl">
                   <ChatComposer
                     value={question}
@@ -539,6 +602,7 @@ export default function ChatPage() {
                     onChange={setQuestion}
                     onSend={onSend}
                     onStop={onStop}
+                    compact={isMobile}
                   />
                 </div>
               </div>

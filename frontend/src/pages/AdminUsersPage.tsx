@@ -196,9 +196,9 @@ export default function AdminUsersPage() {
     <Layout className="min-h-screen bg-neutral-50">
       <PageHeader title="用户管理" />
 
-      <Content className="p-6">
+      <Content className="p-3 md:p-6">
         <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-3 md:px-4">
             <Text type="secondary"></Text>
             <Button type="primary" onClick={() => setCreateOpen(true)}>
               新建用户
@@ -209,6 +209,7 @@ export default function AdminUsersPage() {
             loading={loading}
             columns={columns}
             dataSource={users}
+            scroll={{ x: 800 }}
             pagination={{ pageSize: 10, showTotal: (total) => `共 ${total} 条` }}
           />
         </div>
