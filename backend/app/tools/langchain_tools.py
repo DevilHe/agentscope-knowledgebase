@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.agents.permissions import is_tool_allowed_for_role
 from app.audit.tool_runtime import audit_tool_success, consume_tool_call, guard_tool_call
@@ -32,6 +32,16 @@ class WeatherInput(BaseModel):
             "多城市一次传入，不要多次调用本工具。"
         )
     )
+
+    @field_validator("cities", mode="before")
+    @classmethod
+    def _coerce_cities(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            text = value.strip()
+            return [text] if text else []
+        if isinstance(value, (list, tuple)):
+            return [str(v).strip() for v in value if str(v).strip()]
+        return []
 
 
 _WEB_ERROR_PREFIXES = (

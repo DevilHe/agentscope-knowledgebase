@@ -109,7 +109,13 @@ export default function ChatPage() {
   const initialSessionRef = useRef(searchParams.get("session"));
   const bootstrappedRef = useRef(false);
   const streamingAssistRef = useRef<string | null>(null);
+  /** 本次发送的助手消息 id，不因 loading effect 被清空，供 onSend 收尾判断 */
+  const sendAssistIdRef = useRef<string | null>(null);
   const loadingSessionRef = useRef<string | null>(null);
+  const activeSessionIdRef = useRef<string | undefined>(activeSessionId);
+  const loadingRef = useRef(loading);
+  activeSessionIdRef.current = activeSessionId;
+  loadingRef.current = loading;
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -127,9 +133,11 @@ export default function ChatPage() {
 
   const loadSessionById = useCallback(
     async (id: string) => {
-      if (loading) detach();
+      // 切会话时始终解除 UI 绑定，避免闭包里过期的 loading 导致不 detach
+      detach();
       loadingSessionRef.current = id;
       streamingAssistRef.current = null;
+      sendAssistIdRef.current = null;
       setStreamingId(null);
       setActiveSessionId(id);
       setActiveSession(id);
@@ -200,7 +208,7 @@ export default function ChatPage() {
     );
   }, [streamingId, loading, answer, cotTrace]);
 
-  // 流结束后强制关掉打字光标，避免 loading 已结束但 message.streaming 仍为 true
+  // 流结束后关掉打字光标；不清 sendAssistIdRef，留给 onSend 用 result 写最终消息
   useEffect(() => {
     if (loading) return;
     setStreamingId(null);
@@ -256,9 +264,10 @@ export default function ChatPage() {
       setSessionNavOpen(false);
       return;
     }
-    if (loading) detach();
+    if (loadingRef.current) detach();
     loadingSessionRef.current = null;
     streamingAssistRef.current = null;
+    sendAssistIdRef.current = null;
     setStreamingId(null);
     setActiveSessionId(undefined);
     reset();
@@ -271,8 +280,9 @@ export default function ChatPage() {
     try {
       stopIfSession(id);
       await deleteSession(id);
-      if (sessionId === id || activeSessionId === id) {
+      if (sessionId === id || activeSessionIdRef.current === id) {
         streamingAssistRef.current = null;
+        sendAssistIdRef.current = null;
         setStreamingId(null);
         setActiveSessionId(undefined);
         reset();
@@ -288,10 +298,12 @@ export default function ChatPage() {
 
   const onSend = async () => {
     const q = question.trim();
-    if (!q || loading) return;
+    if (!q || loadingRef.current) return;
     const assistId = crypto.randomUUID();
     const initialCot = buildInitialCotTrace(q);
+    const originSessionId = activeSessionIdRef.current;
     streamingAssistRef.current = assistId;
+    sendAssistIdRef.current = assistId;
     setStreamingId(assistId);
     setMessages((prev) => [
       ...prev,
@@ -307,11 +319,17 @@ export default function ChatPage() {
       },
     ]);
     setQuestion("");
-    const originSessionId = activeSessionId;
-    const result = await ask(q, activeSessionId);
-    const attached = streamingAssistRef.current === assistId;
+    const result = await ask(q, originSessionId);
+    // 仍停留在本次发送对应的会话 UI 上（未被切走 / 新开）
+    const stillOnSend =
+      sendAssistIdRef.current === assistId &&
+      (result.status !== "done" ||
+        !result.sessionId ||
+        activeSessionIdRef.current === undefined ||
+        activeSessionIdRef.current === originSessionId ||
+        activeSessionIdRef.current === result.sessionId);
 
-    if (attached) {
+    if (stillOnSend) {
       if (result.status === "error") {
         message.error(result.message);
         setMessages((prev) =>
@@ -363,15 +381,25 @@ export default function ChatPage() {
         );
       }
       streamingAssistRef.current = null;
+      sendAssistIdRef.current = null;
       setStreamingId(null);
-    } else if (result.status === "error" && originSessionId && activeSessionId === originSessionId) {
+    } else if (
+      result.status === "error" &&
+      originSessionId &&
+      activeSessionIdRef.current === originSessionId
+    ) {
       message.error(result.message);
     }
 
     if (result.status === "done") {
       await loadSessions();
       const doneSessionId = result.sessionId;
-      if (!attached && doneSessionId && activeSessionId === doneSessionId) {
+      // 仅当用户仍停留在该会话且本轮 UI 未接管写消息时，才 refetch（落库已在 done 前完成）
+      if (
+        !stillOnSend &&
+        doneSessionId &&
+        activeSessionIdRef.current === doneSessionId
+      ) {
         await loadSessionById(doneSessionId);
       }
     }

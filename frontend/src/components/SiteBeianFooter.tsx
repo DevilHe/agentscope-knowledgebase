@@ -8,10 +8,12 @@ export default function SiteBeianFooter({ light = false }: { light?: boolean }) 
 
   return (
     <footer
-      className={`absolute bottom-0 left-0 right-0 z-10 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 text-center text-xs ${textClass}`}
+      className={`pointer-events-none relative z-10 mt-6 w-full px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-center text-xs leading-relaxed ${textClass}`}
     >
-      <span>{beian}</span>
-      <span className="mx-1.5">Copyright © {year}</span>
+      <div className="flex flex-col items-center gap-0.5 sm:flex-row sm:justify-center sm:gap-2">
+        <span>{beian}</span>
+        <span>Copyright © {year}</span>
+      </div>
     </footer>
   );
 }

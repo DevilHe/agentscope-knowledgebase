@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from app.utils.datetime_ser import to_utc_iso
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.auth.deps import (
@@ -159,7 +160,14 @@ def _resolve_password(encrypted: str) -> str:
 @router.get("/captcha", response_model=CaptchaResponse)
 def get_captcha():
     captcha_id, image = create_captcha()
-    return CaptchaResponse(captcha_id=captcha_id, image=image)
+    # 禁止浏览器/代理缓存：否则会拿到已消费或过期的 captcha_id
+    return JSONResponse(
+        content=CaptchaResponse(captcha_id=captcha_id, image=image).model_dump(),
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

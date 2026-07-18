@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -26,6 +27,8 @@ from app.config import settings
 from app.db.models import ChatMessage, ChatSession, User
 from app.services.llm import resolve_model_name
 from app.services.source_trust import sources_view
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_session(db: Session, user_id: str, session_id: str | None) -> str:
@@ -69,18 +72,21 @@ def save_messages(
     answer: str,
     sources: list,
     cot: dict | None = None,
+    *,
+    assistant_message_id: str | None = None,
+    user_message_id: str | None = None,
 ) -> str:
     now = datetime.utcnow()
     db.add(
         ChatMessage(
-            id=str(uuid.uuid4()),
+            id=user_message_id or str(uuid.uuid4()),
             session_id=session_id,
             role="user",
             content=question,
             created_at=now,
         )
     )
-    msg_id = str(uuid.uuid4())
+    msg_id = assistant_message_id or str(uuid.uuid4())
     db.add(
         ChatMessage(
             id=msg_id,
@@ -255,23 +261,30 @@ async def stream_rag_answer(
             cot_collector,
         ):
             if kind == "error":
-                msg = payload.get("message", "")
-                yield kind, payload
+                msg = str(payload.get("message", ""))
+                # 不可重试：直接结束
                 if "工具调用已达上限" in msg or "回答超时" in msg:
+                    yield kind, payload
                     return
                 stream_failed = True
                 record_agent_failure()
-                return
+                # 已向客户端推过正文则不再 fallback，避免两段答案拼接
+                if chunks:
+                    yield kind, payload
+                    return
+                # 尚未产出正文：保留失败态，尝试 fallback（先不向客户端发 error）
+                break
             if kind == "token":
                 chunks.append(payload["delta"])
             yield kind, payload
-        record_agent_success()
+        else:
+            record_agent_success()
     except Exception:
         stream_failed = True
         record_agent_failure()
 
     fallback_model = settings.openai_model_fallback.strip()
-    if stream_failed and fallback_model and fallback_model != model_name:
+    if stream_failed and not chunks and fallback_model and fallback_model != model_name:
         chunks = []
         sources_collector = []
         cot_collector = CotTraceCollector()
@@ -280,7 +293,7 @@ async def stream_rag_answer(
             db,
             action="llm_call",
             resource_type="session",
-            resource_id=session_id,
+            resource_id=sid,
             detail={"model": fallback_model, "scene": "fallback"},
             ip_address=ip_address,
         )
@@ -319,11 +332,28 @@ async def stream_rag_answer(
     final_sources = sources_payload["items"]
     intent = "rag" if final_sources else "general"
     cot_snapshot = cot_collector.snapshot()
+    msg_id = str(uuid.uuid4())
+    user_msg_id = str(uuid.uuid4())
+
+    # 先落库再发 done：保证历史可拉取；前端在收到 done 时立即结束 loading
+    try:
+        save_messages(
+            db,
+            sid,
+            question,
+            answer,
+            final_sources,
+            cot=cot_snapshot,
+            assistant_message_id=msg_id,
+            user_message_id=user_msg_id,
+        )
+    except Exception:
+        logger.exception("save_messages failed session_id=%s message_id=%s", sid, msg_id)
+        yield "error", {"message": "回答已生成但保存失败，请重试"}
+        return
 
     yield "sources", sources_payload
     yield "intent", {"intent": intent}
-
-    msg_id = save_messages(db, sid, question, answer, final_sources, cot=cot_snapshot)
     yield "done", {
         "session_id": sid,
         "message_id": msg_id,

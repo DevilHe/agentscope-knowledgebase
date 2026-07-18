@@ -54,6 +54,8 @@ async def rag_chat(
                 ip_address=ip,
                 knowledge_bases=kb_slugs,
             ):
+                if await request.is_disconnected():
+                    return
                 payload = json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else data
                 yield {"event": event, "data": payload}
         except PermissionError:
@@ -61,5 +63,17 @@ async def rag_chat(
                 "event": "error",
                 "data": json.dumps({"message": "无权访问该会话"}, ensure_ascii=False),
             }
+        except Exception:
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": "服务异常，请稍后重试"}, ensure_ascii=False),
+            }
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(
+        event_generator(),
+        ping=15,
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
