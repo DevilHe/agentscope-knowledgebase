@@ -25,12 +25,12 @@ type SourcesPayload = {
 function parseSseBlock(block: string): { event: string; data: string } | null {
   if (!block.trim()) return null;
   let event = "message";
-  const dataLines: string[] = [];
+  let data = "";
   for (const line of block.split("\n")) {
     if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+    else if (line.startsWith("data:")) data += line.slice(5).trimStart();
   }
-  return { event, data: dataLines.join("\n") };
+  return { event, data };
 }
 
 function upsertCotStep(steps: CotStep[], incoming: CotStep): CotStep[] {
@@ -113,7 +113,6 @@ export function useRagStream() {
     let currentSession = streamSessionId;
     let streamError: string | null = null;
     let completed = false;
-    let cancelReader = true;
 
     setLoading(true);
     setAnswer("");
@@ -124,7 +123,6 @@ export function useRagStream() {
     setIntent(null);
 
     const isUiAttached = () => uiGenerationRef.current === uiGen;
-    const isCurrentTask = () => activeTaskRef.current?.controller === controller;
 
     const syncIfAttached = () => {
       if (!isUiAttached()) return;
@@ -168,99 +166,87 @@ export function useRagStream() {
       let buffer = "";
 
       const handleEvent = (event: string, data: string) => {
-        try {
-          if (event === "intent") {
-            const parsed = JSON.parse(data);
-            if (parsed.intent === "rag" || parsed.intent === "general") {
-              if (isUiAttached()) setIntent(parsed.intent);
-            }
+        if (event === "intent") {
+          const parsed = JSON.parse(data);
+          if (parsed.intent === "rag" || parsed.intent === "general") {
+            if (isUiAttached()) setIntent(parsed.intent);
           }
-          if (event === "sources") {
-            const parsed = JSON.parse(data) as SourcesPayload | SourceDoc[];
-            if (Array.isArray(parsed)) {
-              currentSources = parsed;
-              currentShowSources = parsed.length > 0;
-            } else {
-              currentSources = parsed.items || [];
-              currentShowSources = Boolean(parsed.show_sources);
-            }
-            syncIfAttached();
+        }
+        if (event === "sources") {
+          const parsed = JSON.parse(data) as SourcesPayload | SourceDoc[];
+          if (Array.isArray(parsed)) {
+            currentSources = parsed;
+            currentShowSources = parsed.length > 0;
+          } else {
+            currentSources = parsed.items || [];
+            currentShowSources = Boolean(parsed.show_sources);
           }
-          if (event === "tool") {
-            const parsed = JSON.parse(data) as ToolStep;
-            if (isUiAttached()) {
-              setToolSteps((prev) => upsertToolStep(prev, parsed));
-            }
+          syncIfAttached();
+        }
+        if (event === "tool") {
+          const parsed = JSON.parse(data) as ToolStep;
+          if (isUiAttached()) {
+            setToolSteps((prev) => upsertToolStep(prev, parsed));
           }
-          if (event === "cot") {
-            const parsed = JSON.parse(data) as {
-              action: "add" | "update" | "finish" | "remove" | "unfinish";
-              step?: CotStep;
-              step_id?: string;
-              duration_ms?: number;
+        }
+        if (event === "cot") {
+          const parsed = JSON.parse(data) as {
+            action: "add" | "update" | "finish" | "remove" | "unfinish";
+            step?: CotStep;
+            step_id?: string;
+            duration_ms?: number;
+          };
+          if (parsed.action === "remove" && parsed.step_id) {
+            currentCot = {
+              ...currentCot,
+              steps: currentCot.steps.filter((s) => s.id !== parsed.step_id),
             };
-            if (parsed.action === "remove" && parsed.step_id) {
-              currentCot = {
-                ...currentCot,
-                steps: currentCot.steps.filter((s) => s.id !== parsed.step_id),
-              };
-            }
-            if (parsed.action === "unfinish") {
-              currentCot = {
-                ...currentCot,
-                finished: false,
-                durationMs: undefined,
-              };
-            }
-            if (parsed.action === "add" && parsed.step) {
-              currentCot = {
-                ...currentCot,
-                steps: upsertCotStep(currentCot.steps, parsed.step),
-              };
-            }
-            if (parsed.action === "update" && parsed.step) {
-              currentCot = {
-                ...currentCot,
-                steps: upsertCotStep(currentCot.steps, parsed.step),
-              };
-            }
-            if (parsed.action === "finish") {
-              currentCot = finalizeCotTrace(currentCot, parsed.duration_ms, {
-                keepGenerateRunning: true,
-              });
-            }
-            syncIfAttached();
           }
-          if (event === "token") {
-            const { delta } = JSON.parse(data);
-            currentAnswer += delta;
-            syncIfAttached();
+          if (parsed.action === "unfinish") {
+            currentCot = {
+              ...currentCot,
+              finished: false,
+              durationMs: undefined,
+            };
           }
-          if (event === "done") {
-            const parsed = JSON.parse(data);
-            if (parsed.session_id) {
-              currentSession = parsed.session_id;
-              if (activeTaskRef.current?.controller === controller) {
-                activeTaskRef.current.sessionId = parsed.session_id;
-              }
-              if (isUiAttached()) setSessionId(parsed.session_id);
-            }
-            if (typeof parsed.show_sources === "boolean") {
-              currentShowSources = parsed.show_sources;
-            }
-            currentCot = finalizeCotTrace(currentCot);
-            completed = true;
-            syncIfAttached();
-            // 收到 done 立即结束 loading；不 cancel reader，让后端完成落库
-            if (isUiAttached()) setLoading(false);
-            cancelReader = false;
+          if (parsed.action === "add" && parsed.step) {
+            currentCot = {
+              ...currentCot,
+              steps: upsertCotStep(currentCot.steps, parsed.step),
+            };
           }
-          if (event === "error") {
-            const parsed = JSON.parse(data);
-            streamError = parsed.message || "请求被拦截";
+          if (parsed.action === "update" && parsed.step) {
+            currentCot = {
+              ...currentCot,
+              steps: upsertCotStep(currentCot.steps, parsed.step),
+            };
           }
-        } catch {
-          // 单条 SSE 坏包跳过，避免整段流失败
+          if (parsed.action === "finish") {
+            currentCot = finalizeCotTrace(currentCot, parsed.duration_ms, { keepGenerateRunning: true });
+          }
+          syncIfAttached();
+        }
+        if (event === "token") {
+          const { delta } = JSON.parse(data);
+          currentAnswer += delta;
+          syncIfAttached();
+        }
+        if (event === "done") {
+          const parsed = JSON.parse(data);
+          if (parsed.session_id) {
+            currentSession = parsed.session_id;
+            if (isUiAttached()) setSessionId(parsed.session_id);
+          }
+          if (typeof parsed.show_sources === "boolean") {
+            currentShowSources = parsed.show_sources;
+          }
+          currentCot = finalizeCotTrace(currentCot);
+          completed = true;
+          syncIfAttached();
+        }
+        if (event === "error") {
+          const parsed = JSON.parse(data);
+          streamError = parsed.message || "请求被拦截";
         }
       };
 
@@ -305,24 +291,13 @@ export function useRagStream() {
             };
           }
 
-          // 连接关闭，或已收到 done（loading 已关，不再 cancel 以免打断后端收尾）
-          if (done || completed) break;
+          if (done) break;
         }
       } finally {
-        buffer += decoder.decode();
-        flushBuffer();
-        if (cancelReader || signal.aborted) {
-          try {
-            await reader.cancel();
-          } catch {
-            /* ignore */
-          }
-        } else {
-          try {
-            reader.releaseLock();
-          } catch {
-            /* ignore */
-          }
+        try {
+          await reader.cancel();
+        } catch {
+          /* ignore */
         }
       }
 
@@ -345,7 +320,7 @@ export function useRagStream() {
       currentCot = finalizeCotTrace(currentCot);
       syncIfAttached();
 
-      if (completed || currentAnswer.trim()) {
+      if (completed) {
         return {
           status: "done",
           answer: currentAnswer,
@@ -373,13 +348,13 @@ export function useRagStream() {
         answer: currentAnswer,
       };
     } finally {
-      // 仅当前任务可改 loading，避免旧请求 finally 清掉新请求的 loading
-      if (isCurrentTask()) {
-        setLoading(false);
+      // 无论 UI 是否仍绑定，结束任务时都关掉 loading，避免光标/发送态卡住
+      setLoading(false);
+      if (isUiAttached()) {
+        setCotTrace((prev) => (prev.steps.length ? finalizeCotTrace(prev) : prev));
+      }
+      if (activeTaskRef.current?.controller === controller) {
         activeTaskRef.current = null;
-        if (isUiAttached()) {
-          setCotTrace((prev) => (prev.steps.length ? finalizeCotTrace(prev) : prev));
-        }
       }
     }
   }, [sessionId]);

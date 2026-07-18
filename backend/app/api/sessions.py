@@ -97,10 +97,7 @@ def list_messages(
     for row in rows:
         raw_sources = None
         if row.sources_json:
-            try:
-                raw_sources = json.loads(row.sources_json)
-            except json.JSONDecodeError:
-                raw_sources = None
+            raw_sources = json.loads(row.sources_json)
         raw_cot = None
         if row.cot_json:
             try:
@@ -110,7 +107,7 @@ def list_messages(
             except json.JSONDecodeError:
                 raw_cot = None
         view = (
-            sources_view(row.content, raw_sources if isinstance(raw_sources, list) else None)
+            sources_view(row.content, raw_sources)
             if row.role == "assistant"
             else {"show_sources": False, "items": None}
         )

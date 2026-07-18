@@ -23,18 +23,8 @@ def web_search(query: str, max_results: int = 3) -> str:
         data = response.json()
 
         results = []
-        for item in data.get("results", []) or []:
-            if not isinstance(item, dict):
-                continue
-            title = str(item.get("title") or "").strip() or "无标题"
-            content = str(item.get("content") or "").strip()
-            url = str(item.get("url") or "").strip()
-            line = f"- {title}"
-            if content:
-                line += f"\n  {content}"
-            if url:
-                line += f"\n  {url}"
-            results.append(line)
+        for item in data.get("results", []):
+            results.append(f"- {item['title']}\n  {item['content']}\n  {item['url']}")
 
         return "\n".join(results) if results else f"没有找到关于「{query}」的结果"
 

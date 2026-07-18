@@ -13,50 +13,40 @@ export async function fetchWithTimeout(
   init: RequestInit = {},
   timeoutMs: number = API_TIMEOUT_MS
 ): Promise<Response> {
-  const timeoutController = new AbortController();
+  const controller = new AbortController();
   const externalSignal = init.signal;
   let timedOut = false;
 
   const timer = window.setTimeout(() => {
     timedOut = true;
-    timeoutController.abort();
+    controller.abort();
   }, timeoutMs);
 
-  let signal: AbortSignal = timeoutController.signal;
-  let removeBridge: (() => void) | undefined;
+  const onExternalAbort = () => {
+    window.clearTimeout(timer);
+    controller.abort(externalSignal?.reason);
+  };
 
   if (externalSignal) {
-    if (typeof AbortSignal !== "undefined" && "any" in AbortSignal) {
-      signal = AbortSignal.any([timeoutController.signal, externalSignal]);
+    if (externalSignal.aborted) {
+      window.clearTimeout(timer);
+      controller.abort(externalSignal.reason);
     } else {
-      const bridge = new AbortController();
-      const onAbort = () => bridge.abort();
-      if (timeoutController.signal.aborted || externalSignal.aborted) {
-        bridge.abort();
-      } else {
-        timeoutController.signal.addEventListener("abort", onAbort);
-        externalSignal.addEventListener("abort", onAbort);
-        removeBridge = () => {
-          timeoutController.signal.removeEventListener("abort", onAbort);
-          externalSignal.removeEventListener("abort", onAbort);
-        };
-      }
-      signal = bridge.signal;
+      externalSignal.addEventListener("abort", onExternalAbort, { once: true });
     }
   }
 
   try {
-    // 拿到响应头后取消「建连超时」；SSE body 仍受外部 signal 约束
-    const res = await fetch(input, { ...init, signal });
-    window.clearTimeout(timer);
+    const res = await fetch(input, { ...init, signal: controller.signal });
     return res;
   } catch (error) {
-    window.clearTimeout(timer);
-    removeBridge?.();
     if (timedOut && !(externalSignal?.aborted)) {
       throw new Error("请求超时，请稍后重试");
     }
     throw error;
+  } finally {
+    window.clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -116,13 +106,7 @@ export function setAuth(
 
 export function getStoredUser(): StoredUser | null {
   const raw = authStorage.getItem(USER_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as StoredUser;
-  } catch {
-    clearAuth();
-    return null;
-  }
+  return raw ? JSON.parse(raw) : null;
 }
 
 export function updateStoredUser(patch: Partial<StoredUser>) {
@@ -221,20 +205,15 @@ function dedupeRequest<T>(store: { current: Promise<T> | null }, fn: () => Promi
   return store.current;
 }
 
+const captchaRequest: { current: Promise<CaptchaInfo> | null } = { current: null };
 const sessionsRequest: { current: Promise<unknown> | null } = { current: null };
 
 export async function fetchCaptcha(): Promise<CaptchaInfo> {
-  // 不走 dedupe：刷新必须拿到新验证码；带时间戳避免中间层缓存旧 captcha_id
-  const res = await fetchWithTimeout(`/api/auth/captcha?t=${Date.now()}`, {
-    method: "GET",
-    headers: {
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-    },
-    cache: "no-store",
+  return dedupeRequest(captchaRequest, async () => {
+    const res = await fetchWithTimeout("/api/auth/captcha");
+    if (!res.ok) throw new Error(await parseError(res));
+    return res.json();
   });
-  if (!res.ok) throw new Error(await parseError(res));
-  return res.json();
 }
 
 export async function login(

@@ -258,11 +258,6 @@ async def stream_agent_events(
                     generate_started = cot.generate_emitted
 
                 if tool_call_count >= limit:
-                    if cot.generate_emitted:
-                        yield {"type": "cot", "action": "update", "step": cot.generate_done()}
-                    finish = cot.finish_payload()
-                    if finish:
-                        yield {"type": "cot", "action": "finish", **finish}
                     yield {
                         "type": "error",
                         "message": f"工具调用已达上限（{limit} 次），请简化问题后重试",
@@ -270,11 +265,6 @@ async def stream_agent_events(
                     return
 
     except Exception as exc:
-        if cot.generate_emitted:
-            yield {"type": "cot", "action": "update", "step": cot.generate_done()}
-        finish = cot.finish_payload()
-        if finish:
-            yield {"type": "cot", "action": "finish", **finish}
         yield {"type": "error", "message": f"Agent 执行失败：{exc}"}
         return
 

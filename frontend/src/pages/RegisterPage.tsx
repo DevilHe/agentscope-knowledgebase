@@ -65,19 +65,14 @@ export default function RegisterPage() {
     captcha_answer: string;
     department_id: string;
   }) => {
-    if (!captcha?.captcha_id) {
-      setError("验证码未加载，请点击图片刷新");
-      await loadCaptcha().catch(() => undefined);
-      return;
-    }
-    const captchaId = captcha.captcha_id;
+    if (!captcha) return;
     setLoading(true);
     setError("");
     try {
       await register(
         values.username,
         values.password,
-        captchaId,
+        captcha.captcha_id,
         values.captcha_answer,
         values.department_id
       );
@@ -86,9 +81,7 @@ export default function RegisterPage() {
       navigate("/login", { replace: true });
     } catch (err) {
       setError((err as Error).message || "注册失败");
-      setCaptcha(null);
-      form.setFieldValue("captcha_answer", "");
-      await loadCaptcha().catch((e) => setError((e as Error).message || "验证码刷新失败"));
+      await loadCaptcha();
     } finally {
       setLoading(false);
     }
@@ -96,13 +89,13 @@ export default function RegisterPage() {
 
   return (
     <div
-      className={`relative flex min-h-[100dvh] flex-col items-center justify-center overflow-x-hidden overflow-y-auto px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] ${
+      className={`relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] ${
         isMobile ? "bg-neutral-50" : "bg-[#0b1220]"
       }`}
     >
       {!isMobile && <ParticleWave color={0x7dd3fc} amountX={50} amountY={50} />}
       <Card
-        className={`relative z-10 w-full max-w-sm shrink-0 shadow-xl ${
+        className={`relative z-10 w-full max-w-sm shadow-xl ${
           isMobile
             ? "border border-neutral-200 bg-white"
             : "border border-white/10 bg-white/95 backdrop-blur-sm"
@@ -175,14 +168,7 @@ export default function RegisterPage() {
                 noStyle
                 rules={[{ required: true, message: "请输入验证码" }]}
               >
-                <Input
-                  placeholder="请输入验证码"
-                  size="large"
-                  className="flex-1"
-                  maxLength={4}
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                />
+                <Input placeholder="请输入验证码" size="large" className="flex-1" maxLength={4} />
               </Form.Item>
               <button
                 type="button"
