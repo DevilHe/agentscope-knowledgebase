@@ -1,6 +1,6 @@
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Form, Input, Typography, message } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchCaptcha, login, type CaptchaInfo } from "../api/client";
 import ParticleWave from "../components/ParticleWave";
@@ -16,10 +16,12 @@ export default function LoginPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [captcha, setCaptcha] = useState<CaptchaInfo | null>(null);
+  const captchaRef = useRef<CaptchaInfo | null>(null);
   const registrationEnabled = isRegistrationEnabled();
 
   const loadCaptcha = useCallback(async () => {
     const data = await fetchCaptcha();
+    captchaRef.current = data;
     setCaptcha(data);
     form.setFieldValue("captcha_answer", "");
   }, [form]);
@@ -31,6 +33,7 @@ export default function LoginPage() {
       try {
         const data = await fetchCaptcha();
         if (!active) return;
+        captchaRef.current = data;
         setCaptcha(data);
         form.setFieldValue("captcha_answer", "");
       } catch (err) {
@@ -49,13 +52,23 @@ export default function LoginPage() {
     password: string;
     captcha_answer: string;
   }) => {
-    if (!captcha) return;
+    const current = captchaRef.current;
+    if (!current) return;
     setLoading(true);
     try {
-      await login(values.username, values.password, captcha.captcha_id, values.captcha_answer);
+      await login(
+        values.username,
+        values.password,
+        current.captcha_id,
+        values.captcha_answer
+      );
       navigate("/chat", { replace: true });
     } catch (err) {
       message.error((err as Error).message || "登录失败");
+      // 校验失败后服务端已删除旧 id，必须清空再拉新码
+      captchaRef.current = null;
+      setCaptcha(null);
+      form.setFieldValue("captcha_answer", "");
       await loadCaptcha().catch((e) => message.error((e as Error).message));
     } finally {
       setLoading(false);

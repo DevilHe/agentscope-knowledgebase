@@ -27,7 +27,7 @@ from app.auth.service import (
     record_failed_login,
     register_user,
 )
-from app.auth.captcha import create_captcha, verify_captcha
+from app.auth.captcha import captcha_json_response, create_captcha, verify_captcha
 from app.auth.token_store import (
     check_rate_limit,
     get_refresh_token,
@@ -159,7 +159,7 @@ def _resolve_password(encrypted: str) -> str:
 @router.get("/captcha", response_model=CaptchaResponse)
 def get_captcha():
     captcha_id, image = create_captcha()
-    return CaptchaResponse(captcha_id=captcha_id, image=image)
+    return captcha_json_response(captcha_id, image)
 
 
 @router.post("/login", response_model=TokenResponse)

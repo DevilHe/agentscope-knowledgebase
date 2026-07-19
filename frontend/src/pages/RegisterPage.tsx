@@ -1,6 +1,6 @@
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Form, Input, Select, Typography, message } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearAuth, fetchCaptcha, fetchPublicDepartments, register, type CaptchaInfo } from "../api/client";
 import ParticleWave from "../components/ParticleWave";
@@ -25,11 +25,13 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [captcha, setCaptcha] = useState<CaptchaInfo | null>(null);
+  const captchaRef = useRef<CaptchaInfo | null>(null);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const registrationEnabled = isRegistrationEnabled();
 
   const loadCaptcha = useCallback(async () => {
     const data = await fetchCaptcha();
+    captchaRef.current = data;
     setCaptcha(data);
     form.setFieldValue("captcha_answer", "");
   }, [form]);
@@ -41,6 +43,7 @@ export default function RegisterPage() {
       try {
         const [captchaData, deptData] = await Promise.all([fetchCaptcha(), fetchPublicDepartments()]);
         if (!active) return;
+        captchaRef.current = captchaData;
         setCaptcha(captchaData);
         setDepartments(deptData.items || []);
         form.setFieldValue("captcha_answer", "");
@@ -65,14 +68,15 @@ export default function RegisterPage() {
     captcha_answer: string;
     department_id: string;
   }) => {
-    if (!captcha) return;
+    const current = captchaRef.current;
+    if (!current) return;
     setLoading(true);
     setError("");
     try {
       await register(
         values.username,
         values.password,
-        captcha.captcha_id,
+        current.captcha_id,
         values.captcha_answer,
         values.department_id
       );
@@ -81,6 +85,9 @@ export default function RegisterPage() {
       navigate("/login", { replace: true });
     } catch (err) {
       setError((err as Error).message || "注册失败");
+      captchaRef.current = null;
+      setCaptcha(null);
+      form.setFieldValue("captcha_answer", "");
       await loadCaptcha();
     } finally {
       setLoading(false);

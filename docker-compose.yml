@@ -30,13 +30,14 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
-    command: redis-server --maxmemory 48mb --maxmemory-policy allkeys-lru
+    # 过小 + allkeys-lru 会把未过期的验证码 key 挤掉，表现为「验证码错误或已过期」
+    command: redis-server --maxmemory 96mb --maxmemory-policy volatile-lru
     volumes:
       - redis_data:/data
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
 
   qdrant:
     image: qdrant/qdrant:v1.12.5

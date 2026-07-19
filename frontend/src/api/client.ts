@@ -205,15 +205,20 @@ function dedupeRequest<T>(store: { current: Promise<T> | null }, fn: () => Promi
   return store.current;
 }
 
-const captchaRequest: { current: Promise<CaptchaInfo> | null } = { current: null };
 const sessionsRequest: { current: Promise<unknown> | null } = { current: null };
 
 export async function fetchCaptcha(): Promise<CaptchaInfo> {
-  return dedupeRequest(captchaRequest, async () => {
-    const res = await fetchWithTimeout("/api/auth/captcha");
-    if (!res.ok) throw new Error(await parseError(res));
-    return res.json();
+  // 禁止去重/缓存：否则会拿到已校验删除或过期的 captcha_id，表现为「错误或已过期」
+  const res = await fetchWithTimeout(`/api/auth/captcha?t=${Date.now()}`, {
+    method: "GET",
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+    cache: "no-store",
   });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
 }
 
 export async function login(
