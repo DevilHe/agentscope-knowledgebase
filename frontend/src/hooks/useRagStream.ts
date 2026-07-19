@@ -181,6 +181,17 @@ export function useRagStream() {
             currentSources = parsed.items || [];
             currentShowSources = Boolean(parsed.show_sources);
           }
+          // sources 仅在全部 token 之后、落库之前到达；此处收掉「生成回答」running，
+          // 不依赖正文停更猜测（避免输出间隙误判为完成）
+          currentCot = {
+            ...currentCot,
+            steps: currentCot.steps.map((step) =>
+              step.status === "running" &&
+              (step.phase === "generate" || step.kind === "generate" || step.id === "generate")
+                ? { ...step, status: "done" as const }
+                : step
+            ),
+          };
           syncIfAttached();
         }
         if (event === "tool") {

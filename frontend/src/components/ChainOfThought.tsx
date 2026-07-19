@@ -39,13 +39,19 @@ function sortSteps(steps: CotStep[]) {
 
 const DONE_ICON_STYLE = { color: "#22c55e" };
 
-function PhaseIcon({ step, traceFinished }: { step: CotStep; traceFinished: boolean }) {
-  // 思考结束后仍允许「生成回答」保持 running，直到流结束
+function PhaseIcon({
+  step,
+  traceFinished,
+}: {
+  step: CotStep;
+  traceFinished: boolean;
+}) {
+  // 以 step.status 为准（generate_done 后为 done）；勿用正文停更猜测
   const status =
-    step.status === "running"
-      ? "running"
-      : step.status === "error"
-        ? "error"
+    step.status === "error"
+      ? "error"
+      : step.status === "running"
+        ? "running"
         : traceFinished || step.status === "done"
           ? "done"
           : step.status;
@@ -83,7 +89,10 @@ function formatDuration(ms?: number) {
   return `${Math.round(sec)} 秒`;
 }
 
-export default function ChainOfThought({ trace, streaming = false }: ChainOfThoughtProps) {
+export default function ChainOfThought({
+  trace,
+  streaming = false,
+}: ChainOfThoughtProps) {
   const [expanded, setExpanded] = useState(true);
   const orderedSteps = useMemo(() => sortSteps(trace.steps), [trace.steps]);
   const isActive = !trace.finished && streaming;

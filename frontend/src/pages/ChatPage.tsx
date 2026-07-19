@@ -540,6 +540,15 @@ export default function ChatPage() {
                         ? finalizeCotTrace(rawCot)
                         : rawCot;
                     const showCot = Boolean(liveCot && liveCot.steps.length > 0);
+                    const generateDone = Boolean(
+                      liveCot?.steps.some(
+                        (s) =>
+                          (s.phase === "generate" ||
+                            s.kind === "generate" ||
+                            s.id === "generate") &&
+                          s.status === "done"
+                      )
+                    );
 
                     return (
                       <div key={m.id} className={m.role === "user" ? "flex justify-end" : ""}>
@@ -562,7 +571,10 @@ export default function ChatPage() {
                                 <MarkdownView
                                   content={liveContent}
                                   streaming={Boolean(
-                                    m.streaming && loading && m.id === streamingId
+                                    m.streaming &&
+                                      loading &&
+                                      m.id === streamingId &&
+                                      !generateDone
                                   )}
                                 />
                               ) : null}
