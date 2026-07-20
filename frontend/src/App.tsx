@@ -5,6 +5,7 @@ import AdminAuditPage from "./pages/AdminAuditPage";
 import AdminPage from "./pages/AdminPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import ChatPage from "./pages/ChatPage";
+import LegalPage from "./pages/LegalPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 
@@ -14,6 +15,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/legal" element={<LegalPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/admin" element={<AdminPage />} />

@@ -3,6 +3,7 @@ import { Alert, Button, Card, Form, Input, Select, Typography, message } from "a
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { clearAuth, fetchCaptcha, fetchPublicDepartments, register, type CaptchaInfo } from "../api/client";
+import AuthLegalNotice from "../components/AuthLegalNotice";
 import ParticleWave from "../components/ParticleWave";
 import SiteBeianFooter from "../components/SiteBeianFooter";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -118,7 +119,6 @@ export default function RegisterPage() {
         {error && <Alert type="error" message={error} showIcon className="!mb-4" />}
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
-            label="用户名"
             name="username"
             rules={[
               {
@@ -138,7 +138,6 @@ export default function RegisterPage() {
             />
           </Form.Item>
           <Form.Item
-            label="密码"
             name="password"
             rules={[
               {
@@ -168,7 +167,7 @@ export default function RegisterPage() {
               options={departments.map((d) => ({ value: d.id, label: d.name }))}
             />
           </Form.Item>
-          <Form.Item label="验证码" required>
+          <Form.Item>
             <div className="flex items-center gap-2">
               <Form.Item
                 name="captcha_answer"
@@ -197,6 +196,7 @@ export default function RegisterPage() {
             <Button type="primary" htmlType="submit" loading={loading} block size="large">
               注册
             </Button>
+            <AuthLegalNotice />
           </Form.Item>
         </Form>
         <div className="mt-4 text-center">

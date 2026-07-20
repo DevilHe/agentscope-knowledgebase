@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, Typography, message } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchCaptcha, login, type CaptchaInfo } from "../api/client";
+import AuthLegalNotice from "../components/AuthLegalNotice";
 import ParticleWave from "../components/ParticleWave";
 import SiteBeianFooter from "../components/SiteBeianFooter";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -98,14 +99,12 @@ export default function LoginPage() {
         </div>
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
-            label="用户名"
             name="username"
             rules={[{ required: true, message: "请输入用户名" }]}
           >
             <Input placeholder="请输入用户名" prefix={<UserOutlined />} autoComplete="username" size="large" />
           </Form.Item>
           <Form.Item
-            label="密码"
             name="password"
             rules={[{ required: true, message: "请输入密码" }]}
           >
@@ -117,7 +116,7 @@ export default function LoginPage() {
               visibilityToggle={{ tabIndex: -1 }}
             />
           </Form.Item>
-          <Form.Item label="验证码" required>
+          <Form.Item>
             <div className="flex items-center gap-2">
               <Form.Item
                 name="captcha_answer"
@@ -155,6 +154,7 @@ export default function LoginPage() {
             <Button type="primary" htmlType="submit" loading={loading} block size="large">
               登录
             </Button>
+            <AuthLegalNotice />
           </Form.Item>
         </Form>
       </Card>
