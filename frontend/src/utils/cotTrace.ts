@@ -48,9 +48,11 @@ export function finalizeCotTrace(
     trace.durationMs ??
     (trace.startedAt ? Math.max(1, Date.now() - trace.startedAt) : undefined);
 
+  // 必须用原始 steps 判断：若用映射后的 steps.every 却 return 旧 trace，
+  // 会把仍为 running 的「生成回答」原样留下。
   if (
     trace.finished &&
-    steps.every((s) => s.status === "done" || s.status === "error") &&
+    trace.steps.every((s) => s.status === "done" || s.status === "error") &&
     trace.durationMs === resolvedDuration
   ) {
     return trace;

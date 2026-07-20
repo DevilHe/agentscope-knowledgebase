@@ -251,13 +251,18 @@ export function useRagStream() {
           if (typeof parsed.show_sources === "boolean") {
             currentShowSources = parsed.show_sources;
           }
+          // 终态：所有 running（含「生成回答」）→ done，对勾替换 loading
           currentCot = finalizeCotTrace(currentCot);
           completed = true;
           syncIfAttached();
+          if (isUiAttached()) setLoading(false);
         }
         if (event === "error") {
           const parsed = JSON.parse(data);
           streamError = parsed.message || "请求被拦截";
+          currentCot = finishSnapshot();
+          syncIfAttached();
+          if (isUiAttached()) setLoading(false);
         }
       };
 
@@ -291,9 +296,9 @@ export function useRagStream() {
           if (value) buffer += decoder.decode(value, { stream: true });
           flushBuffer();
 
+          if (completed) break;
+
           if (streamError) {
-            currentCot = finishSnapshot();
-            syncIfAttached();
             return {
               status: "error",
               message: streamError,
