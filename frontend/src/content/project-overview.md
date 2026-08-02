@@ -129,54 +129,9 @@
 
 ---
 
-## 检索配置参考
+## 说明
 
-```env
-# 是否启用混合检索；false 时仅稠密向量检索
-RETRIEVAL_HYBRID_ENABLED=true
-# 是否启用 LLM 重排序；true 精度更高但更慢，默认关闭以优先响应速度
-RETRIEVAL_RERANK_ENABLED=false
-# 混合检索每路召回候选数（Qdrant dense / sparse prefetch）
-RETRIEVAL_CANDIDATE_TOP_K=12
-# 送入 LLM Rerank 的候选条数上限（仅 RETRIEVAL_RERANK_ENABLED=true 时生效）
-RETRIEVAL_RERANK_CANDIDATES=8
-# 文档分块（semantic=embedding 语义边界 + 超长 fixed 兜底；fixed=仅固定 token）
-# 单块目标 512–1024 token（下限内置，上限=CHUNK_TOKEN_SIZE）
-CHUNK_STRATEGY=semantic
-CHUNK_TOKEN_SIZE=1024
-CHUNK_TOKEN_OVERLAP=154
-CHUNK_SEMANTIC_SIMILARITY_THRESHOLD=0.60
-# 对话检索最终返回给模型的片段数（引用来源条数上限）
-TOP_K=4
-```
-
-## Agent 治理配置参考
-
-```env
-# 单轮对话工具调用上限
-AGENT_MAX_TOOL_ROUNDS=8
-# 流式回答总超时（秒）
-AGENT_REPLY_TIMEOUT_SECONDS=600
-# 熔断：连续失败次数 / 冷却秒数
-AGENT_CIRCUIT_BREAKER_FAIL_THRESHOLD=5
-AGENT_CIRCUIT_BREAKER_COOLDOWN_SECONDS=120
-# 单用户每日 Token 估算配额（0=不限）
-USER_TOKEN_QUOTA_DAILY=0
-USER_TOKEN_ESTIMATE_CHARS_PER_TOKEN=2.0
-# 多轮历史窗口与压缩摘要
-HISTORY_MAX_MESSAGES=20
-HISTORY_COMPRESS_ENABLED=true
-HISTORY_COMPRESS_THRESHOLD=12
-HISTORY_KEEP_RECENT=8
-# Prompt 稳定版与灰度（文件：backend/app/prompts/prompts.yml）
-AGENT_PROMPT_VERSION=v1
-AGENT_PROMPT_CANARY_VERSION=v2
-AGENT_PROMPT_CANARY_PERCENT=10
-# 模型路由（空则使用 OPENAI_MODEL）
-OPENAI_MODEL_CHAT=sensenova-6.7-flash-lite
-OPENAI_MODEL_RERANK=deepseek-v4-flash
-OPENAI_MODEL_FALLBACK=sensenova-u1-fast
-```
+可以使用 user/User@123 账户登录，admin 为管理员账户
 
 ---
 
