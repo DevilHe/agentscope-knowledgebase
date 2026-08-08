@@ -20,9 +20,10 @@ type ChainOfThoughtProps = {
 
 const PHASE_ORDER: Record<string, number> = {
   analyze: 0,
-  plan: 1,
-  execute: 2,
-  generate: 3,
+  reasoning: 1,
+  plan: 2,
+  execute: 3,
+  generate: 4,
 };
 
 function sortSteps(steps: CotStep[]) {
@@ -67,7 +68,12 @@ function PhaseIcon({
   }
 
   const muted = "mt-0.5 shrink-0 text-[15px] text-neutral-400";
-  if (step.phase === "analyze" || step.icon === "analyze") {
+  if (
+    step.phase === "analyze" ||
+    step.phase === "reasoning" ||
+    step.kind === "reasoning" ||
+    step.icon === "analyze"
+  ) {
     return <BulbOutlined className={muted} />;
   }
   if (step.phase === "plan" || step.icon === "spark") {

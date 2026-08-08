@@ -59,6 +59,26 @@ def _chunk_text(chunk: AIMessageChunk | AIMessage) -> str:
     return ""
 
 
+def _chunk_reasoning(chunk: AIMessageChunk | AIMessage) -> str:
+    """提取 NVIDIA / DeepSeek 等供应商的 reasoning_content 增量。"""
+    additional = getattr(chunk, "additional_kwargs", None) or {}
+    if isinstance(additional, dict):
+        reasoning = additional.get("reasoning_content")
+        if isinstance(reasoning, str) and reasoning:
+            return reasoning
+    content = getattr(chunk, "content", None)
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype in ("reasoning", "thinking", "reasoning_content"):
+                parts.append(str(block.get("text") or block.get("reasoning_content") or ""))
+        return "".join(parts)
+    return ""
+
+
 async def stream_agent_events(
     question: str,
     history: list,
@@ -132,11 +152,19 @@ async def stream_agent_events(
                                 tc.get("args") or ""
                             )
                     continue
+
+                reasoning_delta = _chunk_reasoning(chunk)
+                if reasoning_delta:
+                    for cot_event in cot.append_reasoning(reasoning_delta):
+                        yield cot_event
+
                 delta = _chunk_text(chunk)
                 if not delta:
                     continue
                 saw_token = True
                 if not generate_started and not pending_starts:
+                    for cot_event in cot.mark_reasoning_done():
+                        yield cot_event
                     if not cot.tool_used and not cot.plan_emitted:
                         yield {"type": "cot", "action": "update", "step": cot.analyze_done()}
                         plan = cot.ensure_plan(None)
@@ -180,6 +208,8 @@ async def stream_agent_events(
                 tool_inputs[tool_call_id] = raw_input
                 pending_starts.add(tool_call_id)
 
+                for cot_event in cot.mark_reasoning_done():
+                    yield cot_event
                 for retract_event in cot.retract_generate():
                     yield retract_event
                 generate_started = False
@@ -267,6 +297,9 @@ async def stream_agent_events(
     except Exception as exc:
         yield {"type": "error", "message": f"Agent 执行失败：{exc}"}
         return
+
+    for cot_event in cot.mark_reasoning_done():
+        yield cot_event
 
     # 无工具直接回答收尾
     if saw_token and not cot.tool_used:

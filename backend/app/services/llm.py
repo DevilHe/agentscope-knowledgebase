@@ -1,13 +1,45 @@
 """LLM 封装：OpenAI 兼容 Chat（LangChain ChatOpenAI）。"""
 
-from collections.abc import AsyncIterator
+from __future__ import annotations
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from collections.abc import AsyncIterator, Mapping
+from typing import Any, cast
+
+from langchain_core.messages import (
+    AIMessageChunk,
+    BaseMessageChunk,
+    HumanMessage,
+    SystemMessage,
+)
 from langchain_openai import ChatOpenAI
+from langchain_openai.chat_models import base as openai_chat_base
 
 from app.config import settings
 
 _MODEL_CACHE: dict[tuple[str, bool, str], ChatOpenAI] = {}
+
+# ChatOpenAI 官方实现会丢弃第三方字段 reasoning_content；补回以便流式思考展示。
+_orig_convert_delta = openai_chat_base._convert_delta_to_message_chunk
+
+
+def _convert_delta_to_message_chunk_with_reasoning(
+    _dict: Mapping[str, Any], default_class: type[BaseMessageChunk]
+) -> BaseMessageChunk:
+    chunk = _orig_convert_delta(_dict, default_class)
+    reasoning = _dict.get("reasoning_content")
+    if not reasoning or not isinstance(chunk, AIMessageChunk):
+        return chunk
+    additional_kwargs = dict(chunk.additional_kwargs or {})
+    additional_kwargs["reasoning_content"] = reasoning
+    return cast(
+        AIMessageChunk,
+        chunk.model_copy(update={"additional_kwargs": additional_kwargs}),
+    )
+
+
+openai_chat_base._convert_delta_to_message_chunk = (
+    _convert_delta_to_message_chunk_with_reasoning
+)
 
 
 def resolve_model_name(scene: str = "chat") -> str:

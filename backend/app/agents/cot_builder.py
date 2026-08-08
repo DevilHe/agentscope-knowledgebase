@@ -76,6 +76,9 @@ class CotBuilder:
         self.plan_emitted = False
         self.generate_emitted = False
         self.tool_used = False
+        self.reasoning_text = ""
+        self.reasoning_emitted = False
+        self.reasoning_done = False
 
     def initial_steps(self) -> list[dict[str, Any]]:
         return [
@@ -128,6 +131,52 @@ class CotBuilder:
         self.plan_emitted = True
         self.plan_tool = tool
         return "add", self._build_plan_step(tool)
+
+    def _reasoning_step(self, *, status: str = "running") -> dict[str, Any]:
+        return {
+            "id": "reasoning",
+            "phase": "reasoning",
+            "kind": "reasoning",
+            "text": self.reasoning_text,
+            "icon": "analyze",
+            "status": status,
+        }
+
+    def append_reasoning(self, delta: str) -> list[dict[str, Any]]:
+        """追加模型原生思考（reasoning_content），立即流式展示。"""
+        if not delta:
+            return []
+        self.reasoning_text += delta
+        events: list[dict[str, Any]] = []
+        if not self.reasoning_emitted:
+            self.reasoning_emitted = True
+            events.append(
+                {"type": "cot", "action": "update", "step": self.analyze_done()}
+            )
+            events.append(
+                {"type": "cot", "action": "add", "step": self._reasoning_step()}
+            )
+        else:
+            events.append(
+                {
+                    "type": "cot",
+                    "action": "update",
+                    "step": self._reasoning_step(),
+                }
+            )
+        return events
+
+    def mark_reasoning_done(self) -> list[dict[str, Any]]:
+        if not self.reasoning_emitted or self.reasoning_done:
+            return []
+        self.reasoning_done = True
+        return [
+            {
+                "type": "cot",
+                "action": "update",
+                "step": self._reasoning_step(status="done"),
+            }
+        ]
 
     def retract_generate(self) -> list[dict[str, Any]]:
         """工具介入时撤回「生成回答」，并重新打开思考计时。"""

@@ -13,7 +13,7 @@ export interface SourceDoc {
 
 export interface CotStep {
   id: string;
-  phase?: "analyze" | "plan" | "execute" | "generate";
+  phase?: "analyze" | "plan" | "execute" | "generate" | "reasoning";
   kind: "analyze" | "plan" | "execute" | "generate" | "reasoning" | "tool" | "generating";
   text: string;
   tool?: string;
