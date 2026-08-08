@@ -28,14 +28,15 @@ def create_chat_agent(
     model_name: str | None = None,
 ):
     """创建按需检索 ReAct 图；返回 (compiled_graph, prompt_version, system_prompt)。"""
+    resolved_model = model_name or resolve_model_name("chat")
     system_prompt, prompt_version = resolve_system_prompt(user.id if user else None)
+    system_prompt = system_prompt.replace("{model_name}", resolved_model)
     tools = create_agent_tools(
         top_k=top_k,
         sources_out=sources_out,
         user=user,
         user_role=user_role,
     )
-    resolved_model = model_name or resolve_model_name("chat")
     model = get_chat_model(stream=True, model_name=resolved_model)
     model_with_tools = model.bind_tools(tools) if tools else model
 

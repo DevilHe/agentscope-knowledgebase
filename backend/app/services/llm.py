@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 
 from app.config import settings
 
-_MODEL_CACHE: dict[tuple[str, bool], ChatOpenAI] = {}
+_MODEL_CACHE: dict[tuple[str, bool, str], ChatOpenAI] = {}
 
 
 def resolve_model_name(scene: str = "chat") -> str:
@@ -21,20 +21,47 @@ def resolve_model_name(scene: str = "chat") -> str:
     return settings.openai_model
 
 
+def resolve_llm_credentials(
+    *,
+    scene: str = "chat",
+    model_name: str | None = None,
+) -> tuple[str, str, str]:
+    """返回 (model_name, api_key, base_url)。
+
+    当 scene 为 fallback，或模型名等于备用模型时，使用备用网关。
+    """
+    name = model_name or resolve_model_name(scene)
+    use_fallback = scene == "fallback" or (
+        bool(settings.openai_model_fallback)
+        and name == settings.openai_model_fallback
+    )
+    if use_fallback and (
+        settings.openai_api_key_fallback or settings.openai_base_url_fallback
+    ):
+        return (
+            name,
+            settings.openai_api_key_fallback or settings.openai_api_key,
+            settings.openai_base_url_fallback or settings.openai_base_url,
+        )
+    return name, settings.openai_api_key, settings.openai_base_url
+
+
 def get_chat_model(
     *,
     stream: bool = True,
     model_name: str | None = None,
     scene: str = "chat",
 ) -> ChatOpenAI:
-    name = model_name or resolve_model_name(scene)
-    key = (name, stream)
+    name, api_key, base_url = resolve_llm_credentials(
+        scene=scene, model_name=model_name
+    )
+    key = (name, stream, base_url)
     cached = _MODEL_CACHE.get(key)
     if cached is not None:
         return cached
     model = ChatOpenAI(
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
+        api_key=api_key,
+        base_url=base_url,
         model=name,
         temperature=0,
         streaming=stream,

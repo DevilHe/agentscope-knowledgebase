@@ -242,6 +242,7 @@ async def stream_rag_answer(
     deadline = time.monotonic() + reply_timeout_seconds()
     used_model = model_name
     stream_failed = False
+    primary_error: str | None = None
 
     try:
         async for kind, payload in _consume_agent_stream(
@@ -256,19 +257,23 @@ async def stream_rag_answer(
         ):
             if kind == "error":
                 msg = payload.get("message", "")
-                yield kind, payload
                 if "工具调用已达上限" in msg or "回答超时" in msg:
+                    yield kind, payload
                     return
+                # 暂不向前端抛错，先尝试备用模型
+                primary_error = msg
                 stream_failed = True
                 record_agent_failure()
-                return
+                break
             if kind == "token":
                 chunks.append(payload["delta"])
             yield kind, payload
-        record_agent_success()
+        else:
+            record_agent_success()
     except Exception:
         stream_failed = True
         record_agent_failure()
+        primary_error = "模型服务暂时不可用，请稍后重试"
 
     fallback_model = settings.openai_model_fallback.strip()
     if stream_failed and fallback_model and fallback_model != model_name:
@@ -305,11 +310,15 @@ async def stream_rag_answer(
             stream_failed = False
         except Exception:
             record_agent_failure()
-            yield "error", {"message": "模型服务暂时不可用，请稍后重试"}
+            yield "error", {
+                "message": primary_error or "模型服务暂时不可用，请稍后重试"
+            }
             return
 
     if stream_failed:
-        yield "error", {"message": "模型服务暂时不可用，请稍后重试"}
+        yield "error", {
+            "message": primary_error or "模型服务暂时不可用，请稍后重试"
+        }
         return
 
     answer = "".join(chunks)

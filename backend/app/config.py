@@ -127,6 +127,9 @@ class Settings(BaseSettings):
     openai_model_chat: str = ""
     openai_model_rerank: str = ""
     openai_model_fallback: str = ""
+    # 备用模型独立网关（空则复用主网关）
+    openai_base_url_fallback: str = ""
+    openai_api_key_fallback: str = ""
 
     admin_username: str = "admin"
     admin_password: str = ""

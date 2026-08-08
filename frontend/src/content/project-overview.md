@@ -9,7 +9,7 @@
 | 层级       | 技术                                                                          |
 | ---------- | ----------------------------------------------------------------------------- |
 | Agent 框架 | LangGraph ReAct（`tools_condition` 按需检索）+ LangChain Tools                |
-| 大语言模型 | 商汤 SenseNova `sensenova-6.7-flash-lite/sensenova-u1-fast/deepseek-v4-flash` |
+| 大语言模型 | nvidia/nemotron-3-ultra-550b-a55b（备用：商汤 SenseNova `deepseek-v4-flash`） |
 | 向量嵌入   | Ollama `nomic-embed-text`（768 维）                                           |
 | 向量数据库 | Qdrant（自研 dense+sparse hybrid，不用 RAGFlow）                              |
 | 全文检索   | Qdrant sparse（与 dense 同 collection 混合）                                  |
